@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FitCoach — Prototype mobile</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    html, body { background: #050505; }
+    body {
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(132,204,22,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 50% 120%, rgba(132,204,22,0.04) 0%, transparent 60%),
+        #050505;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    }
+    .phone {
+      box-shadow: 0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.03);
+      background: #050505;
+    }
+    .scrollbar-hidden::-webkit-scrollbar { display: none; }
+    .scrollbar-hidden { scrollbar-width: none; -ms-overflow-style: none; }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.5; }
+      70% { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(0.95); opacity: 0; }
+    }
+    .ping-dot { position: relative; }
+    .ping-dot::before {
+      content: ''; position: absolute; inset: -2px; border-radius: 9999px;
+      background: currentColor; animation: pulse-ring 1.6s infinite ease-out;
+    }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .shimmer {
+      background: linear-gradient(90deg, transparent, rgba(163,230,53,0.15), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+    .gradient-lime { background: linear-gradient(135deg, #d9f99d 0%, #84cc16 100%); }
+    .gradient-text { background: linear-gradient(135deg, #d9f99d 0%, #84cc16 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+    .gradient-fire { background: linear-gradient(135deg, #fb923c 0%, #ef4444 100%); }
+    input[type=range].lime { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 9999px; background: #1f1f1f; outline: none; }
+    input[type=range].lime::-webkit-slider-thumb {
+      -webkit-appearance: none; height: 24px; width: 24px; border-radius: 9999px;
+      background: #a3e635; border: 3px solid #1a2e0a;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(163,230,53,0.4);
+    }
+    input[type=range].lime::-moz-range-thumb {
+      height: 24px; width: 24px; border-radius: 9999px;
+      background: #a3e635; border: 3px solid #1a2e0a;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(163,230,53,0.4);
+    }
+    .glass { background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+    .tap-area { -webkit-tap-highlight-color: transparent; }
+    button:focus, input:focus { outline: none; }
+    @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .fade-in { animation: fade-in 0.2s ease-out; }
+    @keyframes scale-in { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .scale-in { animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+  </style>
+</head>
+<body class="text-white">
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    /* =========================================================
+       ICONS — minimal inline SVG set
+       ========================================================= */
+    const Icon = ({ name, size = 20, className = "", strokeWidth = 2 }) => {
+      const props = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth, strokeLinecap: "round", strokeLinejoin: "round", className };
+      const paths = {
+        home: <><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></>,
+        flame: <path d="M12 2s4 4 4 8a4 4 0 0 1-8 0c0-1.5.5-2 1-3-2 0-3 2-3 5a6 6 0 0 0 12 0c0-5-6-10-6-10Z"/>,
+        bell: <><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></>,
+        bolt: <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8z"/>,
+        check: <path d="M20 6 9 17l-5-5"/>,
+        plus: <><path d="M12 5v14"/><path d="M5 12h14"/></>,
+        chevR: <path d="m9 18 6-6-6-6"/>,
+        chevL: <path d="m15 18-6-6 6-6"/>,
+        chevD: <path d="m6 9 6 6 6-6"/>,
+        x: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
+        camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="4"/></>,
+        msg: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
+        users: <><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+        target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
+        chart: <><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></>,
+        utensils: <><path d="M3 2v7c0 1.1.9 2 2 2h2v11"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2z"/></>,
+        moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
+        droplet: <path d="M12 2.69 5.64 9.05a9 9 0 1 0 12.73 0z"/>,
+        footprints: <><path d="M4 16v-2.4a3 3 0 0 1 5.4-1.8l1.7 2.2A1 1 0 0 0 12 14h.6a2 2 0 0 1 1.4 3.4l-3 3"/><path d="M14 6v.4a3 3 0 0 0 .9 2.1l1.6 1.6a3 3 0 0 1 .9 2.1V14"/><circle cx="6" cy="20" r="2"/><circle cx="18" cy="20" r="2"/></>,
+        zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>,
+        heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>,
+        trophy: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></>,
+        send: <><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></>,
+        calendar: <><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>,
+        settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+        logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></>,
+        alert: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/></>,
+        search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+        filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54z"/>,
+        award: <><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></>,
+        sparkle: <><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></>,
+        lock: <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+        mail: <><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></>,
+        eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></>,
+        play: <path d="m6 3 14 9-14 9z"/>,
+        more: <><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></>,
+        edit: <><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></>,
+        info: <><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></>,
+        download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></>,
+        clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></>,
+        crown: <path d="m2 8 4.5 8h11L22 8l-6 4-4-7-4 7z"/>,
+      };
+      return <svg {...props}>{paths[name]}</svg>;
+    };
+
+    /* =========================================================
+       MOCK DATA
+       ========================================================= */
+    const ATHLETE = {
+      id: "a1",
+      firstName: "Sophie",
+      lastName: "Martin",
+      avatar: "https://i.pravatar.cc/200?img=47",
+      startWeight: 78.4,
+      currentWeight: 73.1,
+      goalWeight: 68,
+      height: 168,
+      age: 32,
+      goal: "Perte de gras",
+      proteinTarget: 130,
+      streak: 12,
+      weeklyScore: 84,
+      programDay: 32,
+      programTotal: 90,
+      weightHistory: [78.4, 77.9, 77.2, 76.5, 75.8, 75.2, 74.5, 74.0, 73.6, 73.4, 73.3, 73.1],
+      habitsToday: { water: 6, sleep: 7.5, steps: 8400, nutrition: 4, workout: true, stress: 3, energy: 4 },
+      weekScores: [88, 76, 92, 81, 84, 70, 88],
+      latestFeedback: {
+        coach: "Maxime",
+        date: "2 mai 2026",
+        text: "Très belle semaine ! Ton adhésion nutrition est top. Continue sur cette lancée et augmente progressivement les pas le week-end.",
+      },
+      badges: [
+        { name: "Premier kilo", icon: "trophy", color: "text-yellow-300" },
+        { name: "Semaine parfaite", icon: "sparkle", color: "text-lime-300" },
+        { name: "7 jours d'affilée", icon: "flame", color: "text-orange-400" },
+        { name: "Hydratation pro", icon: "droplet", color: "text-sky-300" },
+      ],
+    };
+
+    const ATHLETES = [
+      { id: "a1", name: "Sophie Martin", avatar: 47, score: 84, streak: 12, status: "ok", lastCheckin: "Il y a 2j", delta: -5.3, low: null },
+      { id: "a2", name: "Thomas Dubois", avatar: 12, score: 62, streak: 3, status: "watch", lastCheckin: "Il y a 4j", delta: -1.2, low: "sleep" },
+      { id: "a3", name: "Camille Rousseau", avatar: 5, score: 91, streak: 21, status: "top", lastCheckin: "Hier", delta: -4.8, low: null },
+      { id: "a4", name: "Léa Bernard", avatar: 32, score: 45, streak: 0, status: "alert", lastCheckin: "Il y a 6j", delta: 0.4, low: "inactivity" },
+      { id: "a5", name: "Marc Lefèvre", avatar: 60, score: 71, streak: 8, status: "ok", lastCheckin: "Hier", delta: -2.1, low: null },
+      { id: "a6", name: "Julie Petit", avatar: 24, score: 38, streak: 0, status: "alert", lastCheckin: "Il y a 5j", delta: 0.7, low: "score" },
+      { id: "a7", name: "Antoine Moreau", avatar: 33, score: 79, streak: 14, status: "ok", lastCheckin: "Aujourd'hui", delta: -3.5, low: null },
+      { id: "a8", name: "Inès Garnier", avatar: 49, score: 88, streak: 19, status: "top", lastCheckin: "Aujourd'hui", delta: -6.2, low: null },
+    ];
+
+    const ALERTS = [
+      { id: "al1", athleteId: "a4", athlete: "Léa Bernard", avatar: 32, severity: "high", title: "Inactivité", text: "Aucun tracking depuis 6 jours", date: "Aujourd'hui" },
+      { id: "al2", athleteId: "a6", athlete: "Julie Petit", avatar: 24, severity: "high", title: "Score faible", text: "Score hebdo 38% — sommeil et nutrition en chute", date: "Aujourd'hui" },
+      { id: "al3", athleteId: "a2", athlete: "Thomas Dubois", avatar: 12, severity: "med", title: "Check-in manqué", text: "Pas de check-in cette semaine", date: "Hier" },
+      { id: "al4", athleteId: "a5", athlete: "Marc Lefèvre", avatar: 60, severity: "low", title: "Plateau", text: "Pas de variation de poids depuis 3 semaines", date: "Il y a 2j" },
+    ];
+
+    const PHASES = [
+      { id: 1, name: "Fondation", range: "J 1–30", desc: "Habitudes & métabolisme" },
+      { id: 2, name: "Construction", range: "J 31–60", desc: "Volume & adhésion" },
+      { id: 3, name: "Performance", range: "J 61–90", desc: "Pic & consolidation" },
+    ];
+
+    const WEEK_OBJECTIVES = [
+      { id: 1, text: "Atteindre 130 g de protéines / jour", done: true },
+      { id: 2, text: "3 séances CrossFit minimum", done: true },
+      { id: 3, text: "7h+ de sommeil 5 jours sur 7", done: false },
+      { id: 4, text: "8 000 pas en moyenne", done: true },
+      { id: 5, text: "Photo de progression dimanche", done: false },
+    ];
+
+    const CHAT = [
+      { id: "m1", from: "coach", text: "Salut Sophie ! Comment s'est passée ta séance d'hier ?", time: "08:42" },
+      { id: "m2", from: "me", text: "Top, j'ai battu mon record sur Fran : 6:42 💪", time: "09:15" },
+      { id: "m3", from: "coach", text: "Énorme. Tu progresses vraiment vite. On garde le même rythme cette semaine ?", time: "09:18" },
+      { id: "m4", from: "me", text: "Oui carrément. Par contre j'ai du mal avec le snack de l'après-midi.", time: "09:22" },
+      { id: "m5", from: "coach", text: "Pas de souci, je te propose un swap : skyr 0% + amandes au lieu du fruit. Plus rassasiant.", time: "09:25" },
+    ];
+
+    const COMMUNITY_POSTS = [
+      { id: "p1", author: "Camille R.", avatar: 5, text: "Pic du jour 🏔️ La rando du week-end ça compte dans les pas ?", time: "2 h", likes: 7, comments: 3 },
+      { id: "p2", author: "Coach Maxime", avatar: 68, coach: true, text: "Rappel : check-in hebdo dimanche soir avant minuit. Photos de face/profil/dos 🔥", time: "5 h", likes: 12, comments: 1 },
+      { id: "p3", author: "Antoine M.", avatar: 33, text: "Premier 100 kg au back squat 💥 merci à tous pour les conseils nutrition", time: "1 j", likes: 24, comments: 8 },
+    ];
+
+    const LEADERBOARD = [
+      { rank: 1, name: "Camille R.", avatar: 5, score: 87 },
+      { rank: 2, name: "Inès G.", avatar: 49, score: 84 },
+      { rank: 3, name: "Sophie M.", avatar: 47, score: 79, me: true },
+      { rank: 4, name: "Antoine M.", avatar: 33, score: 76 },
+      { rank: 5, name: "Marc L.", avatar: 60, score: 71 },
+    ];
+
+    const NUTRITION_DAY = [
+      { meal: "Petit-déjeuner", time: "07:30", desc: "Skyr 0% + flocons d'avoine + banane + cannelle", kcal: 420, p: 32 },
+      { meal: "Déjeuner", time: "12:30", desc: "Poulet grillé 180g + riz basmati + légumes verts", kcal: 580, p: 48 },
+      { meal: "Collation", time: "16:00", desc: "Fromage blanc 0% + amandes (20g) + pomme", kcal: 280, p: 22 },
+      { meal: "Dîner", time: "20:00", desc: "Saumon 150g + patates douces rôties + brocoli", kcal: 540, p: 36 },
+    ];
+
+    const PRICING_PLANS = [
+      { id: "essentiel", name: "Essentiel", price: 19, features: ["Tracking quotidien", "Check-in hebdo", "Programme 90 jours", "Communauté"], color: "from-zinc-700 to-zinc-800" },
+      { id: "pro", name: "Pro", price: 39, popular: true, features: ["Tout Essentiel", "Coaching personnalisé", "Plan nutrition adapté", "Messagerie illimitée", "Vidéo-feedback"], color: "from-lime-500 to-emerald-500" },
+      { id: "elite", name: "Élite", price: 79, features: ["Tout Pro", "Visio mensuelle 30 min", "Plan training sur-mesure", "Priorité réponse < 4h"], color: "from-orange-500 to-red-500" },
+    ];
+
+    const NOTIFS = [
+      { id: 1, title: "C'est l'heure du check-in 🎯", text: "Valide ta journée en moins de 30 secondes", time: "à l'instant", icon: "target" },
+      { id: 2, title: "Bravo, 12 jours d'affilée 🔥", text: "Tu es dans le top 10 cette semaine", time: "Il y a 2h", icon: "flame" },
+      { id: 3, title: "Nouveau message de Maxime", text: "Réponse à ton message sur la nutrition", time: "Hier", icon: "msg" },
+      { id: 4, title: "Check-in hebdo dimanche", text: "N'oublie pas tes photos de progression", time: "Hier", icon: "calendar" },
+    ];
+
+    /* =========================================================
+       UTILITIES
+       ========================================================= */
+    const cls = (...a) => a.filter(Boolean).join(" ");
+    const av = (n) => `https://i.pravatar.cc/120?img=${n}`;
+
+    /* =========================================================
+       PRIMITIVES
+       ========================================================= */
+    const Card = ({ className = "", children, ...rest }) => (
+      <div className={cls("rounded-2xl bg-zinc-900/70 border border-white/5", className)} {...rest}>
+        {children}
+      </div>
+    );
+
+    const Btn = ({ variant = "primary", size = "md", className = "", children, ...rest }) => {
+      const base = "tap-area inline-flex items-center justify-center gap-2 font-semibold rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50";
+      const sizes = { sm: "h-9 px-3 text-sm", md: "h-12 px-5 text-[15px]", lg: "h-14 px-6 text-base" };
+      const variants = {
+        primary: "bg-lime-400 text-zinc-950 hover:bg-lime-300 shadow-[0_8px_24px_-8px_rgba(163,230,53,0.6)]",
+        ghost: "bg-white/5 text-white hover:bg-white/10",
+        outline: "border border-white/10 bg-transparent text-white hover:bg-white/5",
+        dark: "bg-zinc-900 text-white border border-white/10 hover:bg-zinc-800",
+        danger: "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/20",
+      };
+      return <button className={cls(base, sizes[size], variants[variant], className)} {...rest}>{children}</button>;
+    };
+
+    const StatusDot = ({ status }) => {
+      const map = { ok: "bg-lime-400", top: "bg-emerald-400", watch: "bg-amber-400", alert: "bg-red-400" };
+      return <span className={cls("inline-block w-2 h-2 rounded-full", map[status])}></span>;
+    };
+
+    const Avatar = ({ src, n, size = 40, ring }) => (
+      <div className={cls("relative shrink-0 rounded-full overflow-hidden bg-zinc-800", ring && "ring-2 ring-lime-400 ring-offset-2 ring-offset-zinc-950")} style={{ width: size, height: size }}>
+        <img src={src || av(n)} alt="" className="w-full h-full object-cover" />
+      </div>
+    );
+
+    const Pill = ({ children, className = "" }) => (
+      <span className={cls("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium", className)}>{children}</span>
+    );
+
+    /* =========================================================
+       CHARTS — pure SVG
+       ========================================================= */
+    const LineChart = ({ data = [], goal, height = 140, color = "#a3e635" }) => {
+      if (!data.length) return null;
+      const W = 320, H = height, pad = 16;
+      const max = Math.max(...data) + 0.5;
+      const min = Math.min(...data, goal || data[data.length - 1]) - 0.5;
+      const x = (i) => pad + (i * (W - pad * 2)) / (data.length - 1);
+      const y = (v) => pad + ((max - v) / (max - min)) * (H - pad * 2);
+      const path = data.map((v, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(v)}`).join(" ");
+      const area = `${path} L ${x(data.length - 1)} ${H - pad} L ${x(0)} ${H - pad} Z`;
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+          <defs>
+            <linearGradient id="lg-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {goal != null && (
+            <line x1={pad} x2={W - pad} y1={y(goal)} y2={y(goal)} stroke="#fb923c" strokeDasharray="4 4" strokeWidth="1" opacity="0.6" />
+          )}
+          <path d={area} fill="url(#lg-area)" />
+          <path d={path} stroke={color} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          {data.map((v, i) => (
+            <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 4 : 2.5} fill={i === data.length - 1 ? color : "#0f0f0f"} stroke={color} strokeWidth="2" />
+          ))}
+        </svg>
+      );
+    };
+
+    const BarChart = ({ data, height = 80, color = "#a3e635" }) => {
+      const W = 280, H = height, pad = 4;
+      const bw = (W - pad * 2) / data.length;
+      const max = 100;
+      return (
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+          {data.map((v, i) => {
+            const h = (v / max) * (H - 24);
+            return (
+              <g key={i}>
+                <rect x={pad + i * bw + 4} y={H - 20 - h} width={bw - 8} height={h} rx="4" fill={v >= 80 ? color : v >= 60 ? "#facc15" : "#f87171"} opacity="0.9" />
+                <text x={pad + i * bw + bw / 2} y={H - 5} fill="#71717a" fontSize="10" textAnchor="middle">{["L","M","M","J","V","S","D"][i]}</text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    };
+
+    const Ring = ({ value = 0, size = 120, stroke = 10, color = "#a3e635", label, sub }) => {
+      const r = (size - stroke) / 2;
+      const c = 2 * Math.PI * r;
+      const off = c - (value / 100) * c;
+      return (
+        <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            <circle cx={size/2} cy={size/2} r={r} stroke="#27272a" strokeWidth={stroke} fill="none" />
+            <circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="text-2xl font-bold">{label ?? value}<span className="text-sm text-zinc-400">%</span></div>
+            {sub && <div className="text-[10px] uppercase tracking-wide text-zinc-500 mt-0.5">{sub}</div>}
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       NAVIGATION FRAME
+       ========================================================= */
+    const PhoneFrame = ({ children, hideTabBar, tabBar, statusBar = true }) => (
+      <div className="phone w-full max-w-[420px] h-[860px] rounded-[42px] overflow-hidden flex flex-col relative border border-white/10">
+        {statusBar && (
+          <div className="flex items-center justify-between px-7 pt-3 pb-1 text-[11px] font-semibold text-white/80 z-10">
+            <span>9:41</span>
+            <div className="flex items-center gap-1.5">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor"><rect x="0" y="6" width="2" height="4" rx="0.5"/><rect x="3.5" y="4" width="2" height="6" rx="0.5"/><rect x="7" y="2" width="2" height="8" rx="0.5"/><rect x="10.5" y="0" width="2" height="10" rx="0.5"/></svg>
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="currentColor"><path d="M7 0a8 8 0 0 0-7 4l1.4 1A6 6 0 0 1 7 2a6 6 0 0 1 5.6 3L14 4a8 8 0 0 0-7-4Zm0 3a5 5 0 0 0-4.2 2L4 6.2A3.5 3.5 0 0 1 7 5a3.5 3.5 0 0 1 3 1.2L11.2 5A5 5 0 0 0 7 3Zm0 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>
+              <div className="flex items-center gap-0.5">
+                <div className="w-6 h-2.5 rounded-sm border border-white/60 flex items-center p-[1px]"><div className="bg-white h-full w-3/4 rounded-[1px]"></div></div>
+                <div className="w-0.5 h-1 bg-white/60 rounded-r"></div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hidden">{children}</div>
+        {!hideTabBar && tabBar}
+      </div>
+    );
+
+    const TabBar = ({ items, value, onChange }) => (
+      <div className="glass border-t border-white/5 px-2 pt-1.5 pb-5">
+        <div className="flex items-end justify-around">
+          {items.map((it) => {
+            const active = it.key === value;
+            return (
+              <button key={it.key} onClick={() => onChange(it.key)} className="tap-area flex-1 flex flex-col items-center gap-0.5 py-1.5 relative">
+                {active && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-lime-400"></div>}
+                <Icon name={it.icon} size={22} className={active ? "text-lime-400" : "text-zinc-500"} />
+                <span className={cls("text-[10px] font-medium", active ? "text-white" : "text-zinc-500")}>{it.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    /* =========================================================
+       AUTH SCREENS
+       ========================================================= */
+    const Login = ({ onLogin, onSignup }) => (
+      <div className="min-h-full flex flex-col px-6 pt-10 pb-8">
+        <div className="flex-1 flex flex-col">
+          <div className="flex items-center gap-2 mb-12">
+            <div className="w-10 h-10 rounded-xl gradient-lime flex items-center justify-center"><Icon name="bolt" size={20} className="text-zinc-950" strokeWidth={3} /></div>
+            <span className="font-bold text-xl tracking-tight">FitCoach</span>
+          </div>
+          <div className="mb-10">
+            <h1 className="text-[32px] leading-[1.1] font-bold tracking-tight">Coach ton corps,<br/><span className="gradient-text">coach ta tête.</span></h1>
+            <p className="text-zinc-400 text-[15px] mt-3">Programmes, suivi quotidien et feedback de ton coach. Tout dans une seule app.</p>
+          </div>
+          <div className="space-y-3 mb-6">
+            <div className="relative">
+              <Icon name="mail" size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input defaultValue="sophie.martin@gmail.com" className="w-full h-14 bg-zinc-900 border border-white/5 rounded-2xl pl-11 pr-4 text-[15px]" placeholder="Email" />
+            </div>
+            <div className="relative">
+              <Icon name="lock" size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input type="password" defaultValue="••••••••" className="w-full h-14 bg-zinc-900 border border-white/5 rounded-2xl pl-11 pr-12 text-[15px]" placeholder="Mot de passe" />
+              <Icon name="eye" size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            </div>
+            <button className="text-sm text-zinc-400 underline-offset-4 hover:underline">Mot de passe oublié ?</button>
+          </div>
+          <Btn size="lg" onClick={onLogin} className="w-full mb-3">Se connecter</Btn>
+          <Btn size="lg" variant="dark" className="w-full">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Continuer avec Google
+          </Btn>
+          <div className="flex-1"></div>
+          <p className="text-center text-sm text-zinc-400 mt-8">Pas encore de compte ? <button onClick={onSignup} className="text-lime-400 font-semibold">Créer un compte</button></p>
+        </div>
+      </div>
+    );
+
+    /* =========================================================
+       ONBOARDING (4 steps)
+       ========================================================= */
+    const Onboarding = ({ onDone }) => {
+      const [step, setStep] = useState(0);
+      const [data, setData] = useState({ goal: "fat-loss", level: "intermediate", height: 168, weight: 78, target: 68, sex: "F", age: 32, training: 3, notifs: ["daily", "weekly", "motivation"] });
+      const next = () => step < 3 ? setStep(step + 1) : onDone();
+      const prev = () => setStep(Math.max(0, step - 1));
+
+      return (
+        <div className="min-h-full flex flex-col">
+          <div className="flex items-center justify-between px-6 pt-4 pb-2">
+            <button onClick={prev} className={cls("p-2 -ml-2", step === 0 && "invisible")}><Icon name="chevL" /></button>
+            <div className="flex gap-1.5">
+              {[0,1,2,3].map(i => (
+                <div key={i} className={cls("h-1.5 rounded-full transition-all", i === step ? "w-8 bg-lime-400" : i < step ? "w-1.5 bg-lime-400" : "w-1.5 bg-white/10")}></div>
+              ))}
+            </div>
+            <div className="w-9"></div>
+          </div>
+
+          <div className="flex-1 px-6 py-4 fade-in" key={step}>
+            {step === 0 && (
+              <>
+                <h2 className="text-3xl font-bold leading-tight">Quel est ton objectif principal ?</h2>
+                <p className="text-zinc-400 text-sm mt-2">On adapte ton plan en conséquence.</p>
+                <div className="space-y-3 mt-8">
+                  {[
+                    { k: "fat-loss", t: "Perdre du gras", d: "Déficit calorique modéré + cardio + force", e: "🔥" },
+                    { k: "muscle", t: "Prendre du muscle", d: "Surplus protéiné + force progressive", e: "💪" },
+                    { k: "recomp", t: "Recomposition", d: "Maintenir le poids, perdre du gras, gagner du muscle", e: "⚡" },
+                    { k: "perf", t: "Performance CrossFit", d: "Maximiser tes WODs, cardio + force", e: "🏆" },
+                  ].map(o => (
+                    <button key={o.k} onClick={() => setData({...data, goal: o.k})} className={cls("w-full p-4 rounded-2xl border text-left flex items-center gap-3 transition-all", data.goal === o.k ? "border-lime-400 bg-lime-400/5" : "border-white/5 bg-zinc-900/50")}>
+                      <div className="text-2xl">{o.e}</div>
+                      <div className="flex-1">
+                        <div className="font-semibold">{o.t}</div>
+                        <div className="text-xs text-zinc-400 mt-0.5">{o.d}</div>
+                      </div>
+                      {data.goal === o.k && <Icon name="check" size={18} className="text-lime-400" strokeWidth={3} />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {step === 1 && (
+              <>
+                <h2 className="text-3xl font-bold leading-tight">Tes mesures actuelles</h2>
+                <p className="text-zinc-400 text-sm mt-2">Données chiffrées pour ton coach.</p>
+                <div className="space-y-4 mt-8">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 rounded-2xl bg-zinc-900 border border-white/5">
+                      <div className="text-xs text-zinc-400">Sexe</div>
+                      <div className="flex gap-2 mt-2">
+                        {["F", "H"].map(s => (
+                          <button key={s} onClick={() => setData({...data, sex: s})} className={cls("flex-1 h-10 rounded-xl font-semibold text-sm", data.sex === s ? "bg-lime-400 text-zinc-950" : "bg-zinc-800 text-zinc-400")}>{s === "F" ? "Femme" : "Homme"}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-zinc-900 border border-white/5">
+                      <div className="text-xs text-zinc-400">Âge</div>
+                      <div className="text-2xl font-bold mt-2">{data.age} <span className="text-sm text-zinc-500 font-normal">ans</span></div>
+                      <input type="range" min="16" max="70" value={data.age} onChange={e => setData({...data, age: +e.target.value})} className="lime w-full mt-2" />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-zinc-900 border border-white/5">
+                    <div className="text-xs text-zinc-400">Taille</div>
+                    <div className="text-2xl font-bold mt-2">{data.height} <span className="text-sm text-zinc-500 font-normal">cm</span></div>
+                    <input type="range" min="140" max="210" value={data.height} onChange={e => setData({...data, height: +e.target.value})} className="lime w-full mt-2" />
+                  </div>
+                  <div className="p-4 rounded-2xl bg-zinc-900 border border-white/5">
+                    <div className="text-xs text-zinc-400">Poids actuel</div>
+                    <div className="text-2xl font-bold mt-2">{data.weight} <span className="text-sm text-zinc-500 font-normal">kg</span></div>
+                    <input type="range" min="40" max="180" step="0.5" value={data.weight} onChange={e => setData({...data, weight: +e.target.value})} className="lime w-full mt-2" />
+                  </div>
+                  <div className="p-4 rounded-2xl bg-zinc-900 border border-white/5">
+                    <div className="text-xs text-zinc-400">Objectif de poids</div>
+                    <div className="text-2xl font-bold mt-2"><span className="gradient-text">{data.target}</span> <span className="text-sm text-zinc-500 font-normal">kg</span></div>
+                    <input type="range" min="40" max="180" step="0.5" value={data.target} onChange={e => setData({...data, target: +e.target.value})} className="lime w-full mt-2" />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <h2 className="text-3xl font-bold leading-tight">Ton niveau d'activité</h2>
+                <p className="text-zinc-400 text-sm mt-2">Combien de séances par semaine ?</p>
+                <div className="grid grid-cols-3 gap-3 mt-8">
+                  {[1,2,3,4,5,6].map(n => (
+                    <button key={n} onClick={() => setData({...data, training: n})} className={cls("aspect-square rounded-2xl border flex flex-col items-center justify-center", data.training === n ? "border-lime-400 bg-lime-400/10" : "border-white/5 bg-zinc-900")}>
+                      <div className="text-3xl font-bold">{n}</div>
+                      <div className="text-[10px] text-zinc-400 mt-1">{n === 1 ? "séance" : "séances"}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-8">
+                  <div className="text-sm font-semibold mb-3">Ton niveau CrossFit</div>
+                  <div className="space-y-2">
+                    {[
+                      { k: "beginner", t: "Débutant", d: "0–6 mois de pratique" },
+                      { k: "intermediate", t: "Intermédiaire", d: "6 mois – 2 ans" },
+                      { k: "advanced", t: "Confirmé", d: "2 ans+, mouvements complexes maîtrisés" },
+                    ].map(o => (
+                      <button key={o.k} onClick={() => setData({...data, level: o.k})} className={cls("w-full p-3 rounded-2xl border text-left flex items-center justify-between", data.level === o.k ? "border-lime-400 bg-lime-400/5" : "border-white/5 bg-zinc-900/50")}>
+                        <div>
+                          <div className="font-semibold text-sm">{o.t}</div>
+                          <div className="text-xs text-zinc-400">{o.d}</div>
+                        </div>
+                        {data.level === o.k && <Icon name="check" size={18} className="text-lime-400" strokeWidth={3} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <h2 className="text-3xl font-bold leading-tight">Notifications</h2>
+                <p className="text-zinc-400 text-sm mt-2">On t'envoie quoi, et quand ?</p>
+                <div className="space-y-2 mt-8">
+                  {[
+                    { k: "daily", t: "Rappel tracking quotidien", d: "20:00 chaque jour", icon: "target" },
+                    { k: "weekly", t: "Rappel check-in hebdo", d: "Dimanche 19:00", icon: "calendar" },
+                    { k: "motivation", t: "Rappels motivants", d: "1–2 fois par semaine", icon: "flame" },
+                    { k: "coach", t: "Messages de ton coach", d: "Dès qu'un message arrive", icon: "msg" },
+                  ].map(o => {
+                    const on = data.notifs.includes(o.k);
+                    return (
+                      <button key={o.k} onClick={() => setData({...data, notifs: on ? data.notifs.filter(x => x !== o.k) : [...data.notifs, o.k]})} className="w-full p-4 rounded-2xl border border-white/5 bg-zinc-900/50 flex items-center gap-3 text-left">
+                        <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={o.icon} size={18} className="text-lime-400" /></div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm">{o.t}</div>
+                          <div className="text-xs text-zinc-400">{o.d}</div>
+                        </div>
+                        <div className={cls("w-12 h-7 rounded-full relative transition-colors", on ? "bg-lime-400" : "bg-zinc-700")}>
+                          <div className={cls("absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all", on ? "left-[22px]" : "left-0.5")}></div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-8 p-4 rounded-2xl bg-lime-400/5 border border-lime-400/20 flex gap-3">
+                  <Icon name="sparkle" size={20} className="text-lime-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-zinc-300">Tu peux modifier tout ça à tout moment dans <span className="text-white font-semibold">Profil → Notifications</span>.</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="px-6 pb-8 pt-2">
+            <Btn size="lg" onClick={next} className="w-full">{step === 3 ? "Démarrer mon programme" : "Continuer"}</Btn>
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       ATHLETE — DASHBOARD
+       ========================================================= */
+    const AthleteHome = ({ go, openNotifs }) => {
+      const a = ATHLETE;
+      const lost = (a.startWeight - a.currentWeight).toFixed(1);
+      const remaining = (a.currentWeight - a.goalWeight).toFixed(1);
+      return (
+        <div className="px-5 pt-3 pb-6 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar src={a.avatar} size={40} />
+              <div>
+                <div className="text-xs text-zinc-400">Bonjour</div>
+                <div className="font-semibold leading-tight">{a.firstName} 👋</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Pill className="bg-orange-500/15 text-orange-300"><Icon name="flame" size={12} /> {a.streak} j</Pill>
+              <button onClick={openNotifs} className="relative w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center">
+                <Icon name="bell" size={18} />
+                <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-lime-400 ping-dot text-lime-400"></span>
+              </button>
+            </div>
+          </div>
+
+          {/* Hero — weight card */}
+          <Card className="p-5 relative overflow-hidden">
+            <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-lime-400/10 blur-2xl"></div>
+            <div className="flex items-end justify-between relative">
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider">Poids actuel</div>
+                <div className="text-4xl font-bold mt-1">{a.currentWeight} <span className="text-lg text-zinc-500">kg</span></div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Pill className="bg-lime-400/10 text-lime-400">↓ {lost} kg</Pill>
+                  <span className="text-xs text-zinc-500">depuis le départ</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-zinc-400">Objectif</div>
+                <div className="text-xl font-semibold gradient-text">{a.goalWeight} kg</div>
+                <div className="text-[11px] text-zinc-500 mt-0.5">{remaining} kg restants</div>
+              </div>
+            </div>
+            <div className="mt-3 -mx-1">
+              <LineChart data={a.weightHistory} goal={a.goalWeight} height={120} />
+            </div>
+          </Card>
+
+          {/* Score + Daily CTA */}
+          <div className="grid grid-cols-5 gap-3">
+            <Card className="col-span-2 p-4 flex flex-col items-center justify-center">
+              <Ring value={a.weeklyScore} size={92} stroke={8} sub="cette semaine" />
+            </Card>
+            <Card className="col-span-3 p-4 flex flex-col">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-zinc-400 uppercase tracking-wider">Aujourd'hui</div>
+                <Pill className="bg-amber-400/10 text-amber-400">À valider</Pill>
+              </div>
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                <MiniStat icon="droplet" v={a.habitsToday.water} unit="v" color="text-sky-400" />
+                <MiniStat icon="moon" v={a.habitsToday.sleep} unit="h" color="text-indigo-400" />
+                <MiniStat icon="footprints" v={(a.habitsToday.steps/1000).toFixed(1)} unit="k" color="text-amber-400" />
+                <MiniStat icon="utensils" v={a.habitsToday.nutrition} unit="/5" color="text-lime-400" />
+              </div>
+              <Btn size="sm" className="w-full mt-3" onClick={() => go("daily")}>Valider ma journée <Icon name="chevR" size={16} /></Btn>
+            </Card>
+          </div>
+
+          {/* Weekly bars */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider">Score 7 derniers jours</div>
+                <div className="text-sm font-semibold">Moyenne 83%</div>
+              </div>
+              <button onClick={() => go("history")} className="text-xs text-lime-400 font-semibold flex items-center gap-1">Voir tout <Icon name="chevR" size={14} /></button>
+            </div>
+            <BarChart data={ATHLETE.weekScores} height={90} />
+          </Card>
+
+          {/* Coach feedback */}
+          <Card className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Avatar n={68} size={36} ring />
+              <div className="flex-1">
+                <div className="text-sm font-semibold">Coach {a.latestFeedback.coach}</div>
+                <div className="text-xs text-zinc-400">Feedback du {a.latestFeedback.date}</div>
+              </div>
+              <Pill className="bg-emerald-400/10 text-emerald-400">Nouveau</Pill>
+            </div>
+            <p className="text-sm text-zinc-300 leading-relaxed">{a.latestFeedback.text}</p>
+            <button onClick={() => go("messages")} className="w-full mt-3 h-10 rounded-xl bg-zinc-800 text-sm font-medium flex items-center justify-center gap-2"><Icon name="msg" size={16} /> Répondre</button>
+          </Card>
+
+          {/* Programme */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider">Programme 90 jours</div>
+                <div className="text-lg font-semibold mt-0.5">Jour {a.programDay} / {a.programTotal}</div>
+              </div>
+              <button onClick={() => go("program")} className="px-3 h-9 rounded-xl bg-lime-400 text-zinc-950 text-xs font-bold">Voir</button>
+            </div>
+            <div className="mt-3 h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-full gradient-lime rounded-full" style={{ width: `${(a.programDay/a.programTotal)*100}%` }}></div>
+            </div>
+            <div className="flex justify-between text-[10px] text-zinc-500 mt-1.5"><span>Fondation</span><span>Construction</span><span>Performance</span></div>
+          </Card>
+
+          {/* Badges */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs text-zinc-400 uppercase tracking-wider">Tes badges</div>
+              <span className="text-[11px] text-zinc-500">{a.badges.length} / 24</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {a.badges.map((b, i) => (
+                <div key={i} className="aspect-square rounded-2xl bg-zinc-800/60 flex flex-col items-center justify-center p-2">
+                  <Icon name={b.icon} size={22} className={b.color} />
+                  <div className="text-[9px] text-center text-zinc-400 mt-1 leading-tight">{b.name}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      );
+    };
+
+    const MiniStat = ({ icon, v, unit, color }) => (
+      <div className="text-center">
+        <Icon name={icon} size={16} className={cls("mx-auto", color)} />
+        <div className="text-sm font-bold mt-1">{v}<span className="text-[10px] text-zinc-500">{unit}</span></div>
+      </div>
+    );
+
+    /* =========================================================
+       ATHLETE — DAILY TRACKING
+       ========================================================= */
+    const DailyTracking = ({ back, onValidate }) => {
+      const [w, setW] = useState(6);
+      const [s, setS] = useState(7.5);
+      const [steps, setSteps] = useState(8400);
+      const [n, setN] = useState(4);
+      const [workout, setWorkout] = useState(true);
+      const [stress, setStress] = useState(3);
+      const [energy, setEnergy] = useState(4);
+      const [done, setDone] = useState(false);
+
+      const score = useMemo(() => {
+        const ws = Math.min(100, (w / 8) * 100);
+        const ss = Math.min(100, (s / 8) * 100);
+        const sts = Math.min(100, (steps / 10000) * 100);
+        const ns = (n / 5) * 100;
+        const wos = workout ? 100 : 50;
+        const ens = (energy / 5) * 100;
+        const stl = ((6 - stress) / 5) * 100;
+        return Math.round((ws*0.15 + ss*0.2 + sts*0.15 + ns*0.2 + wos*0.15 + ens*0.075 + stl*0.075));
+      }, [w, s, steps, n, workout, stress, energy]);
+
+      if (done) {
+        return (
+          <div className="min-h-full flex flex-col items-center justify-center px-8 text-center fade-in">
+            <div className="w-32 h-32 rounded-full gradient-lime flex items-center justify-center mb-8 scale-in">
+              <Icon name="check" size={64} className="text-zinc-950" strokeWidth={4} />
+            </div>
+            <h2 className="text-3xl font-bold">Journée validée 🎯</h2>
+            <p className="text-zinc-400 mt-3">Score du jour</p>
+            <div className="text-6xl font-bold gradient-text mt-2">{score}<span className="text-2xl text-zinc-400">/100</span></div>
+            <div className="mt-4"><Pill className="bg-orange-500/15 text-orange-300"><Icon name="flame" size={12} /> {ATHLETE.streak + 1} jours d'affilée 🔥</Pill></div>
+            <Btn size="lg" className="mt-10 w-full" onClick={back}>Retour au dashboard</Btn>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-full flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-3 pb-4">
+            <button onClick={back} className="p-2 -ml-2"><Icon name="chevL" /></button>
+            <div className="text-center">
+              <div className="text-sm font-semibold">Aujourd'hui</div>
+              <div className="text-xs text-zinc-500">Lundi 4 mai</div>
+            </div>
+            <div className="text-right text-xs">
+              <div className="text-zinc-500">Score</div>
+              <div className="font-bold text-lime-400">{score}</div>
+            </div>
+          </div>
+
+          <div className="flex-1 px-5 space-y-3 pb-4">
+            <Slider label="Eau" icon="droplet" color="text-sky-400" value={w} unit="verres" min={0} max={12} step={1} onChange={setW} target={8} />
+            <Slider label="Sommeil" icon="moon" color="text-indigo-400" value={s} unit="h" min={0} max={12} step={0.5} onChange={setS} target={8} />
+            <Slider label="Pas" icon="footprints" color="text-amber-400" value={steps} unit="" min={0} max={20000} step={500} onChange={setSteps} target={10000} format={v => `${(v/1000).toFixed(1)}k`} />
+            <Slider label="Adhésion nutrition" icon="utensils" color="text-lime-400" value={n} unit="/ 5" min={0} max={5} step={1} onChange={setN} target={4} />
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center"><Icon name="bolt" size={18} className="text-orange-400" /></div>
+                <div className="flex-1"><div className="text-sm font-semibold">Séance d'entraînement</div></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[{k:true,t:"Faite",e:"💪"},{k:false,t:"Repos",e:"😌"}].map(o => (
+                  <button key={String(o.k)} onClick={() => setWorkout(o.k)} className={cls("h-12 rounded-xl border font-semibold text-sm flex items-center justify-center gap-2", workout === o.k ? "border-lime-400 bg-lime-400/10 text-lime-300" : "border-white/5 bg-zinc-800/50 text-zinc-400")}>
+                    <span>{o.e}</span> {o.t}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <ScoreSelector label="Niveau de stress" icon="heart" color="text-rose-400" value={stress} onChange={setStress} from="Calme" to="Tendu" reverse />
+            <ScoreSelector label="Niveau d'énergie" icon="zap" color="text-yellow-400" value={energy} onChange={setEnergy} from="Vidée" to="En feu" />
+          </div>
+
+          <div className="px-5 pb-8 pt-2">
+            <Btn size="lg" className="w-full" onClick={() => setDone(true)}>Valider ma journée</Btn>
+          </div>
+        </div>
+      );
+    };
+
+    const Slider = ({ label, icon, color, value, unit, min, max, step, onChange, target, format }) => {
+      const pct = ((value - min) / (max - min)) * 100;
+      const onTarget = target && Math.abs(value - target) <= (max - min) * 0.05;
+      return (
+        <Card className="p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={icon} size={18} className={color} /></div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold">{label}</div>
+              {target != null && <div className="text-[11px] text-zinc-500">Objectif {format ? format(target) : target}{unit && ` ${unit}`}</div>}
+            </div>
+            <div className={cls("text-xl font-bold tabular-nums", onTarget ? "text-lime-400" : "text-white")}>{format ? format(value) : value}<span className="text-xs text-zinc-500"> {unit}</span></div>
+          </div>
+          <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} className="lime w-full" />
+          {target != null && (
+            <div className="relative h-0">
+              <div className="absolute -top-3 w-px h-2 bg-orange-400" style={{ left: `${((target - min) / (max - min)) * 100}%` }}></div>
+            </div>
+          )}
+        </Card>
+      );
+    };
+
+    const ScoreSelector = ({ label, icon, color, value, onChange, from, to, reverse }) => (
+      <Card className="p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={icon} size={18} className={color} /></div>
+          <div className="flex-1"><div className="text-sm font-semibold">{label}</div></div>
+        </div>
+        <div className="flex gap-1.5">
+          {[1,2,3,4,5].map(v => {
+            const active = v === value;
+            const intensity = reverse ? 6 - v : v;
+            const colors = ["bg-red-500/20 text-red-400 border-red-500/30","bg-orange-500/20 text-orange-400 border-orange-500/30","bg-amber-500/20 text-amber-400 border-amber-500/30","bg-lime-500/20 text-lime-400 border-lime-500/30","bg-emerald-500/20 text-emerald-400 border-emerald-500/30"];
+            return (
+              <button key={v} onClick={() => onChange(v)} className={cls("flex-1 h-12 rounded-xl border-2 font-bold text-sm transition-all", active ? colors[intensity - 1] : "border-white/5 bg-zinc-800/40 text-zinc-500")}>{v}</button>
+            );
+          })}
+        </div>
+        <div className="flex justify-between text-[11px] text-zinc-500 mt-2"><span>{from}</span><span>{to}</span></div>
+      </Card>
+    );
+
+    /* =========================================================
+       ATHLETE — WEEKLY CHECK-IN
+       ========================================================= */
+    const WeeklyCheckin = ({ back }) => {
+      const [step, setStep] = useState(0);
+      const [w, setW] = useState(73.1);
+      const [feeling, setFeeling] = useState(7);
+      const [adherence, setAdherence] = useState(8);
+      const [sleepQ, setSleepQ] = useState(6);
+      const [moti, setMoti] = useState(8);
+      const [diff, setDiff] = useState("");
+      const [comment, setComment] = useState("");
+      const [done, setDone] = useState(false);
+
+      const score = Math.round(((feeling + adherence + sleepQ + moti) / 40) * 100);
+
+      if (done) {
+        return (
+          <div className="min-h-full flex flex-col items-center justify-center px-8 text-center fade-in">
+            <div className="w-28 h-28 rounded-full gradient-lime flex items-center justify-center mb-6 scale-in">
+              <Icon name="trophy" size={56} className="text-zinc-950" strokeWidth={2.5} />
+            </div>
+            <h2 className="text-3xl font-bold">Check-in envoyé !</h2>
+            <p className="text-zinc-400 mt-3 text-sm">Coach Maxime te répondra dans les 24h.</p>
+            <div className="mt-8 grid grid-cols-2 gap-3 w-full">
+              <Card className="p-4">
+                <div className="text-xs text-zinc-400">Score hebdo</div>
+                <div className="text-3xl font-bold gradient-text mt-1">{score}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-zinc-400">Δ Poids 7j</div>
+                <div className="text-3xl font-bold text-lime-400 mt-1">−0.3<span className="text-sm text-zinc-500"> kg</span></div>
+              </Card>
+            </div>
+            <Btn size="lg" className="mt-8 w-full" onClick={back}>Retour</Btn>
+          </div>
+        );
+      }
+
+      const steps = [
+        { title: "Pèse-toi", subtitle: "Le matin à jeun, c'est mieux" },
+        { title: "Photos de progression", subtitle: "Face, profil, dos — bonne lumière" },
+        { title: "Comment tu te sens ?", subtitle: "Honnête, c'est ce qui aide ton coach" },
+        { title: "Difficultés & objectifs", subtitle: "Dis-nous tout" },
+      ];
+
+      return (
+        <div className="min-h-full flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-3 pb-3">
+            <button onClick={() => step === 0 ? back() : setStep(step - 1)} className="p-2 -ml-2"><Icon name="chevL" /></button>
+            <div className="text-center"><div className="text-sm font-semibold">Check-in semaine 5</div></div>
+            <div className="text-xs text-zinc-500 w-9 text-right">{step + 1}/4</div>
+          </div>
+          <div className="px-5 mb-4">
+            <div className="flex gap-1.5">{[0,1,2,3].map(i => <div key={i} className={cls("h-1 flex-1 rounded-full", i <= step ? "bg-lime-400" : "bg-white/10")}></div>)}</div>
+          </div>
+
+          <div className="flex-1 px-5 fade-in" key={step}>
+            <h2 className="text-2xl font-bold">{steps[step].title}</h2>
+            <p className="text-zinc-400 text-sm mt-1">{steps[step].subtitle}</p>
+
+            {step === 0 && (
+              <div className="mt-8">
+                <Card className="p-6 text-center">
+                  <div className="text-xs text-zinc-400 uppercase tracking-wider">Poids ce matin</div>
+                  <div className="text-5xl font-bold gradient-text mt-2">{w.toFixed(1)} <span className="text-xl text-zinc-500">kg</span></div>
+                  <Pill className="bg-lime-400/10 text-lime-400 mt-3">↓ 0.3 kg vs semaine dernière</Pill>
+                  <input type="range" min="50" max="120" step="0.1" value={w} onChange={e => setW(+e.target.value)} className="lime w-full mt-6" />
+                  <div className="flex justify-between text-xs text-zinc-500 mt-2"><span>50 kg</span><span>120 kg</span></div>
+                </Card>
+                <Card className="mt-3 p-4 flex items-start gap-3">
+                  <Icon name="info" size={18} className="text-sky-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-zinc-300">Pèse-toi <strong className="text-white">à la même heure chaque semaine</strong>, après les WC, avant le petit-déjeuner.</div>
+                </Card>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div className="mt-6 space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  {["Face", "Profil", "Dos"].map((p, i) => (
+                    <div key={p} className="aspect-[3/4] rounded-2xl border-2 border-dashed border-white/10 bg-zinc-900/50 flex flex-col items-center justify-center gap-2 relative overflow-hidden">
+                      {i === 0 ? (
+                        <>
+                          <div className="absolute inset-0 bg-gradient-to-br from-lime-400/20 via-transparent to-transparent"></div>
+                          <Icon name="check" size={28} className="text-lime-400 relative z-10" strokeWidth={3} />
+                          <div className="text-xs font-semibold text-lime-400 relative z-10">{p}</div>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="camera" size={24} className="text-zinc-500" />
+                          <div className="text-xs text-zinc-400">{p}</div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <Card className="p-4 flex items-start gap-3">
+                  <Icon name="lock" size={18} className="text-lime-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-zinc-300">Tes photos sont <strong className="text-white">privées</strong>. Seul ton coach y a accès.</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-xs text-zinc-400 mb-2">Comparaison semaine 1 → semaine 5</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300')] bg-cover bg-center opacity-40"></div>
+                      <div className="absolute bottom-2 left-2 text-[10px] bg-black/60 px-2 py-0.5 rounded">S1 — 78.4 kg</div>
+                    </div>
+                    <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-lime-900/40 to-zinc-900 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300')] bg-cover bg-center opacity-40"></div>
+                      <div className="absolute bottom-2 left-2 text-[10px] bg-lime-500 text-zinc-950 font-bold px-2 py-0.5 rounded">S5 — 73.1 kg</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="mt-6 space-y-3">
+                <FeelSlider label="Sensation générale" value={feeling} onChange={setFeeling} icon="heart" color="text-rose-400" />
+                <FeelSlider label="Adhésion nutrition" value={adherence} onChange={setAdherence} icon="utensils" color="text-lime-400" />
+                <FeelSlider label="Qualité du sommeil" value={sleepQ} onChange={setSleepQ} icon="moon" color="text-indigo-400" />
+                <FeelSlider label="Niveau de motivation" value={moti} onChange={setMoti} icon="bolt" color="text-orange-400" />
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="mt-6 space-y-3">
+                <Card className="p-4">
+                  <div className="text-sm font-semibold mb-2">Quelle a été ta plus grosse difficulté ?</div>
+                  <textarea value={diff} onChange={e => setDiff(e.target.value)} placeholder="Ex: Snack du soir, manque de motivation jeudi, courbatures..." className="w-full bg-zinc-800 border border-white/5 rounded-xl p-3 text-sm h-20 resize-none placeholder:text-zinc-500" />
+                </Card>
+                <Card className="p-4">
+                  <div className="text-sm font-semibold mb-2">Commentaire libre pour le coach</div>
+                  <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Tout ce que tu veux partager..." className="w-full bg-zinc-800 border border-white/5 rounded-xl p-3 text-sm h-24 resize-none placeholder:text-zinc-500" />
+                </Card>
+                <Card className="p-4 bg-lime-400/5 border-lime-400/20">
+                  <div className="text-xs text-zinc-400">Score hebdo estimé</div>
+                  <div className="text-3xl font-bold gradient-text mt-1">{score}<span className="text-base text-zinc-500">/100</span></div>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 pb-8 pt-3">
+            <Btn size="lg" className="w-full" onClick={() => step === 3 ? setDone(true) : setStep(step + 1)}>{step === 3 ? "Envoyer mon check-in" : "Continuer"}</Btn>
+          </div>
+        </div>
+      );
+    };
+
+    const FeelSlider = ({ label, value, onChange, icon, color }) => (
+      <Card className="p-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={icon} size={16} className={color} /></div>
+          <div className="flex-1 text-sm font-semibold">{label}</div>
+          <div className="text-xl font-bold tabular-nums">{value}<span className="text-xs text-zinc-500">/10</span></div>
+        </div>
+        <input type="range" min="1" max="10" value={value} onChange={e => onChange(+e.target.value)} className="lime w-full" />
+      </Card>
+    );
+
+    /* =========================================================
+       ATHLETE — PROGRESS HISTORY
+       ========================================================= */
+    const ProgressHistory = ({ back }) => {
+      const [tab, setTab] = useState("weight");
+      const a = ATHLETE;
+      return (
+        <div className="px-5 pt-3 pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={back} className="p-2 -ml-2"><Icon name="chevL" /></button>
+            <div className="text-sm font-semibold">Historique</div>
+            <button className="p-2 -mr-2"><Icon name="download" size={18} /></button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-900 rounded-2xl mb-4">
+            {[{k:"weight",t:"Poids"},{k:"photos",t:"Photos"},{k:"habits",t:"Habitudes"}].map(o => (
+              <button key={o.k} onClick={() => setTab(o.k)} className={cls("h-9 rounded-xl text-sm font-semibold", tab === o.k ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}>{o.t}</button>
+            ))}
+          </div>
+
+          {tab === "weight" && (
+            <>
+              <Card className="p-5">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-xs text-zinc-400">Poids actuel</div>
+                    <div className="text-3xl font-bold mt-1">{a.currentWeight} <span className="text-base text-zinc-500">kg</span></div>
+                  </div>
+                  <div className="text-right">
+                    <Pill className="bg-lime-400/10 text-lime-400">↓ 5.3 kg en 12 sem.</Pill>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <LineChart data={a.weightHistory} goal={a.goalWeight} height={180} />
+                </div>
+                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/5">
+                  <div><div className="text-[10px] text-zinc-500 uppercase">Min</div><div className="font-bold">73.1 kg</div></div>
+                  <div><div className="text-[10px] text-zinc-500 uppercase">Max</div><div className="font-bold">78.4 kg</div></div>
+                  <div><div className="text-[10px] text-zinc-500 uppercase">Δ moyen / sem.</div><div className="font-bold text-lime-400">−0.44</div></div>
+                </div>
+              </Card>
+              <div className="text-xs text-zinc-400 uppercase tracking-wider mt-5 mb-2">Pesées hebdo</div>
+              {a.weightHistory.slice(-5).reverse().map((v, i) => (
+                <Card key={i} className="p-3 mb-2 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center text-xs font-bold">S{12-i}</div>
+                  <div className="flex-1">
+                    <div className="font-semibold">{v} kg</div>
+                    <div className="text-[11px] text-zinc-500">il y a {i === 0 ? "moins d'1 jour" : `${i} sem.`}</div>
+                  </div>
+                  {i < 4 && <Pill className="bg-lime-400/10 text-lime-400">↓ {(a.weightHistory[a.weightHistory.length - 1 - i] - a.weightHistory[a.weightHistory.length - 2 - i] || -0.1).toFixed(1)}</Pill>}
+                </Card>
+              ))}
+            </>
+          )}
+
+          {tab === "photos" && (
+            <div className="space-y-3">
+              <Card className="p-3">
+                <div className="text-xs text-zinc-400 mb-2">Avant / Maintenant</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400')] bg-cover bg-center opacity-50"></div>
+                    <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[10px]">
+                      <span className="bg-black/70 px-2 py-0.5 rounded">S1</span>
+                      <span className="bg-black/70 px-2 py-0.5 rounded font-bold">78.4 kg</span>
+                    </div>
+                  </div>
+                  <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-lime-900/30 to-zinc-900 relative overflow-hidden ring-1 ring-lime-400/40">
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400')] bg-cover bg-center opacity-50"></div>
+                    <div className="absolute bottom-2 left-2 right-2 flex justify-between text-[10px]">
+                      <span className="bg-lime-500 text-zinc-950 font-bold px-2 py-0.5 rounded">S5</span>
+                      <span className="bg-black/70 px-2 py-0.5 rounded font-bold">73.1 kg</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+              <div className="grid grid-cols-3 gap-2">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="aspect-[3/4] rounded-xl bg-zinc-800 relative overflow-hidden">
+                    <div className={cls("absolute inset-0 bg-cover bg-center opacity-50", `bg-[url('https://images.unsplash.com/photo-15${710 + i}19613454-1cb2f99b2d8b?w=200')]`)}></div>
+                    <div className="absolute bottom-1 left-1 text-[9px] bg-black/70 px-1.5 py-0.5 rounded">S{i}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tab === "habits" && (
+            <div className="space-y-3">
+              {[
+                { name: "Eau", icon: "droplet", color: "text-sky-400", avg: "6.8 / 8 v", trend: 88 },
+                { name: "Sommeil", icon: "moon", color: "text-indigo-400", avg: "7.2 / 8 h", trend: 78 },
+                { name: "Pas", icon: "footprints", color: "text-amber-400", avg: "8 940 / 10k", trend: 72 },
+                { name: "Nutrition", icon: "utensils", color: "text-lime-400", avg: "4.1 / 5", trend: 84 },
+              ].map(h => (
+                <Card key={h.name} className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={h.icon} size={16} className={h.color} /></div>
+                    <div className="flex-1"><div className="text-sm font-semibold">{h.name}</div><div className="text-[11px] text-zinc-500">Moyenne 7j : {h.avg}</div></div>
+                    <div className="text-2xl font-bold tabular-nums">{h.trend}<span className="text-xs text-zinc-500">%</span></div>
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full gradient-lime" style={{ width: `${h.trend}%` }}></div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* =========================================================
+       ATHLETE — NUTRITION
+       ========================================================= */
+    const Nutrition = () => {
+      const totalKcal = NUTRITION_DAY.reduce((s, m) => s + m.kcal, 0);
+      const totalP = NUTRITION_DAY.reduce((s, m) => s + m.p, 0);
+      return (
+        <div className="px-5 pt-3 pb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div><h1 className="text-2xl font-bold">Nutrition</h1><div className="text-xs text-zinc-400">Plan adapté par Coach Maxime</div></div>
+            <button className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center"><Icon name="info" size={18} /></button>
+          </div>
+
+          <Card className="p-5 relative overflow-hidden">
+            <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-lime-400/10 blur-3xl"></div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wider">Objectif protéines / jour</div>
+            <div className="flex items-baseline gap-2 mt-1">
+              <div className="text-5xl font-bold gradient-text">{ATHLETE.proteinTarget}</div>
+              <div className="text-zinc-400">g</div>
+            </div>
+            <div className="mt-3 h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-full gradient-lime relative" style={{ width: `${(totalP/ATHLETE.proteinTarget)*100}%` }}>
+                <div className="absolute inset-0 shimmer"></div>
+              </div>
+            </div>
+            <div className="flex justify-between text-xs mt-2">
+              <span className="text-zinc-400">{totalP} g consommés</span>
+              <span className="font-semibold text-lime-400">{Math.round((totalP/ATHLETE.proteinTarget)*100)}%</span>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="p-3 text-center">
+              <div className="text-[10px] text-zinc-500 uppercase">Kcal</div>
+              <div className="text-xl font-bold mt-1">{totalKcal}</div>
+              <div className="text-[10px] text-zinc-500">/ 1820</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <div className="text-[10px] text-zinc-500 uppercase">Glucides</div>
+              <div className="text-xl font-bold mt-1">182<span className="text-xs text-zinc-500">g</span></div>
+              <div className="text-[10px] text-zinc-500">/ 200</div>
+            </Card>
+            <Card className="p-3 text-center">
+              <div className="text-[10px] text-zinc-500 uppercase">Lipides</div>
+              <div className="text-xl font-bold mt-1">62<span className="text-xs text-zinc-500">g</span></div>
+              <div className="text-[10px] text-zinc-500">/ 65</div>
+            </Card>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">Repas du jour</h3>
+              <Pill className="bg-emerald-400/10 text-emerald-400">Adapté à toi</Pill>
+            </div>
+            <div className="space-y-2">
+              {NUTRITION_DAY.map((m, i) => (
+                <Card key={i} className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-lime-400/10 text-lime-400 flex flex-col items-center justify-center text-[10px] font-bold leading-none">
+                      <span>{m.time.split(":")[0]}h</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <div className="text-sm font-semibold">{m.meal}</div>
+                        <div className="text-[11px] text-zinc-500 shrink-0">{m.kcal} kcal · {m.p}g P</div>
+                      </div>
+                      <div className="text-xs text-zinc-400 mt-1 leading-relaxed">{m.desc}</div>
+                    </div>
+                    <button className="p-1 -mr-1"><Icon name="check" size={18} className="text-lime-400" /></button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <Card className="p-4 bg-gradient-to-br from-lime-400/5 to-transparent border-lime-400/20">
+            <div className="flex items-start gap-3">
+              <Avatar n={68} size={36} ring />
+              <div className="flex-1">
+                <div className="text-xs text-zinc-400">Conseil personnalisé · Coach Maxime</div>
+                <div className="text-sm mt-1 leading-relaxed">"Sophie, ajoute <strong>20 g de protéines en collation</strong> les jours d'entraînement. Skyr 0% ou whey, peu importe. C'est ton point faible des dernières semaines."</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name="clipboard" size={18} className="text-lime-400" /></div>
+              <div className="flex-1"><div className="text-sm font-semibold">Liste de courses</div><div className="text-[11px] text-zinc-500">12 produits cette semaine</div></div>
+              <Icon name="chevR" size={18} className="text-zinc-500" />
+            </div>
+          </Card>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       ATHLETE — MESSAGES
+       ========================================================= */
+    const Messages = ({ back }) => {
+      const [msgs, setMsgs] = useState(CHAT);
+      const [text, setText] = useState("");
+      const send = () => { if (!text.trim()) return; setMsgs([...msgs, { id: Math.random(), from: "me", text, time: "maintenant" }]); setText(""); };
+      return (
+        <div className="min-h-full flex flex-col">
+          <div className="px-5 pt-3 pb-3 flex items-center gap-3 border-b border-white/5">
+            <button onClick={back} className="p-1 -ml-1"><Icon name="chevL" /></button>
+            <Avatar n={68} size={40} ring />
+            <div className="flex-1">
+              <div className="font-semibold text-sm">Coach Maxime</div>
+              <div className="text-[11px] text-emerald-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> En ligne</div>
+            </div>
+            <button className="p-2 -mr-2"><Icon name="more" size={18} /></button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scrollbar-hidden">
+            <div className="text-center text-[11px] text-zinc-500 py-2">Aujourd'hui</div>
+            {msgs.map(m => (
+              <div key={m.id} className={cls("flex", m.from === "me" ? "justify-end" : "justify-start")}>
+                <div className={cls("max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed", m.from === "me" ? "bg-lime-400 text-zinc-950 rounded-br-sm" : "bg-zinc-800 text-white rounded-bl-sm")}>
+                  {m.text}
+                  <div className={cls("text-[10px] mt-1", m.from === "me" ? "text-zinc-700" : "text-zinc-500")}>{m.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-3 py-3 border-t border-white/5 flex items-center gap-2">
+            <button className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center shrink-0"><Icon name="plus" size={18} /></button>
+            <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Écris ton message..." className="flex-1 h-11 bg-zinc-900 border border-white/5 rounded-full px-4 text-sm" />
+            <button onClick={send} className="w-11 h-11 rounded-full gradient-lime flex items-center justify-center shrink-0"><Icon name="send" size={18} className="text-zinc-950" /></button>
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       ATHLETE — 90-DAY PROGRAM
+       ========================================================= */
+    const Program = () => {
+      const day = ATHLETE.programDay, total = ATHLETE.programTotal;
+      const phaseIdx = day <= 30 ? 0 : day <= 60 ? 1 : 2;
+      return (
+        <div className="px-5 pt-3 pb-6 space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">Programme 90 jours</h1>
+            <div className="text-xs text-zinc-400">Transformation complète</div>
+          </div>
+
+          <Card className="p-5 relative overflow-hidden">
+            <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-lime-400/10 blur-3xl"></div>
+            <div className="text-xs text-zinc-400 uppercase tracking-wider">Tu es au jour</div>
+            <div className="flex items-baseline gap-3 mt-1">
+              <div className="text-5xl font-bold gradient-text">{day}</div>
+              <div className="text-zinc-400 text-xl">/ {total}</div>
+            </div>
+            <div className="mt-4 h-3 bg-zinc-800 rounded-full overflow-hidden flex">
+              {[30, 30, 30].map((seg, i) => {
+                const filled = day - i * 30;
+                const pct = Math.max(0, Math.min(seg, filled)) / seg * 100;
+                return (
+                  <div key={i} className="h-full flex-1 relative">
+                    <div className={cls("h-full rounded-full transition-all", i < phaseIdx ? "bg-lime-400" : i === phaseIdx ? "gradient-lime" : "bg-transparent")} style={{ width: i <= phaseIdx ? `${pct}%` : 0 }}></div>
+                    {i < 2 && <div className="absolute right-0 top-0 h-full w-px bg-zinc-950"></div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between mt-2">
+              {PHASES.map((p, i) => (
+                <div key={p.id} className={cls("text-center flex-1", i === phaseIdx ? "" : "opacity-50")}>
+                  <div className={cls("text-[10px] font-bold", i === phaseIdx ? "text-lime-400" : "text-zinc-500")}>{p.name.toUpperCase()}</div>
+                  <div className="text-[9px] text-zinc-500">{p.range}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-12 h-12 rounded-2xl gradient-lime flex items-center justify-center"><Icon name="bolt" size={22} className="text-zinc-950" strokeWidth={3} /></div>
+              <div>
+                <div className="text-xs text-zinc-400 uppercase tracking-wider">Phase actuelle</div>
+                <div className="text-lg font-bold">{PHASES[phaseIdx].name}</div>
+                <div className="text-[11px] text-zinc-400">{PHASES[phaseIdx].desc}</div>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-300 leading-relaxed">Les 30 prochains jours visent à <strong className="text-white">augmenter le volume d'entraînement</strong> tout en consolidant tes acquis nutrition. Attends-toi à un déficit calorique légèrement plus marqué et un focus sur la force.</p>
+          </Card>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">Objectifs de la semaine</h3>
+              <Pill className="bg-lime-400/10 text-lime-400">{WEEK_OBJECTIVES.filter(o => o.done).length}/{WEEK_OBJECTIVES.length}</Pill>
+            </div>
+            <div className="space-y-2">
+              {WEEK_OBJECTIVES.map(o => (
+                <Card key={o.id} className={cls("p-4 flex items-center gap-3", o.done && "opacity-70")}>
+                  <div className={cls("w-7 h-7 rounded-full flex items-center justify-center shrink-0", o.done ? "bg-lime-400" : "border-2 border-white/10")}>
+                    {o.done && <Icon name="check" size={16} className="text-zinc-950" strokeWidth={3} />}
+                  </div>
+                  <div className={cls("text-sm flex-1", o.done && "line-through text-zinc-500")}>{o.text}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-2">Étapes clés</h3>
+            <div className="space-y-2">
+              {[
+                { day: 7, title: "Première pesée hebdo", done: true },
+                { day: 14, title: "Adaptation nutrition", done: true },
+                { day: 30, title: "Fin Fondation 🎯", done: true },
+                { day: 45, title: "Test mi-parcours", done: false, current: true },
+                { day: 60, title: "Bascule Performance", done: false },
+                { day: 90, title: "Photos finales 🏆", done: false },
+              ].map((s, i, arr) => (
+                <div key={s.day} className="flex gap-3">
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className={cls("w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold", s.done ? "bg-lime-400 text-zinc-950" : s.current ? "bg-amber-400 text-zinc-950" : "bg-zinc-800 text-zinc-500 border border-white/5")}>{s.day}</div>
+                    {i < arr.length - 1 && <div className={cls("w-0.5 flex-1 my-1", s.done ? "bg-lime-400" : "bg-zinc-800")}></div>}
+                  </div>
+                  <div className="flex-1 pb-3">
+                    <div className={cls("text-sm font-semibold", s.done ? "text-zinc-300" : s.current ? "text-amber-400" : "text-zinc-500")}>{s.title}</div>
+                    <div className="text-[11px] text-zinc-500">Jour {s.day}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       ATHLETE — COMMUNITY
+       ========================================================= */
+    const Community = () => (
+      <div className="px-5 pt-3 pb-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div><h1 className="text-2xl font-bold">Communauté</h1><div className="text-xs text-zinc-400">Box CrossFit Lyon Part-Dieu</div></div>
+          <button className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center"><Icon name="search" size={18} /></button>
+        </div>
+
+        <Card className="p-5 relative overflow-hidden bg-gradient-to-br from-orange-500/10 via-zinc-900/70 to-zinc-900/70 border-orange-500/20">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <Pill className="bg-orange-500/20 text-orange-400 mb-2"><Icon name="flame" size={12} /> Défi en cours</Pill>
+              <div className="text-xl font-bold">10 000 pas / jour</div>
+              <div className="text-xs text-zinc-400">Encore 4 jours · 18 participants</div>
+            </div>
+            <Icon name="trophy" size={32} className="text-orange-400 opacity-60" />
+          </div>
+          <div className="space-y-1.5">
+            {LEADERBOARD.map(l => (
+              <div key={l.rank} className={cls("flex items-center gap-3 px-2 py-2 rounded-xl", l.me && "bg-lime-400/10 ring-1 ring-lime-400/30")}>
+                <div className={cls("w-7 text-center text-sm font-bold", l.rank === 1 ? "text-yellow-300" : l.rank === 2 ? "text-zinc-300" : l.rank === 3 ? "text-orange-300" : "text-zinc-500")}>{l.rank}</div>
+                <Avatar n={l.avatar} size={32} />
+                <div className="flex-1 text-sm font-semibold">{l.name}{l.me && <span className="text-[10px] text-lime-400 ml-1">(toi)</span>}</div>
+                <div className="text-sm font-bold tabular-nums">{l.score}<span className="text-[10px] text-zinc-500">k pas</span></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hidden -mx-5 px-5">
+          {["Tous","Coach","Transformations","Nutrition","WOD"].map((t,i) => (
+            <button key={t} className={cls("h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap shrink-0", i === 0 ? "bg-lime-400 text-zinc-950" : "bg-zinc-900 text-zinc-300 border border-white/5")}>{t}</button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          {COMMUNITY_POSTS.map(p => (
+            <Card key={p.id} className="p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Avatar n={p.avatar} size={36} ring={p.coach} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold">{p.author}</div>
+                    {p.coach && <Pill className="bg-lime-400/10 text-lime-400">Coach</Pill>}
+                  </div>
+                  <div className="text-[11px] text-zinc-500">{p.time}</div>
+                </div>
+                <button className="p-1"><Icon name="more" size={18} className="text-zinc-500" /></button>
+              </div>
+              <p className="text-sm text-zinc-200 leading-relaxed">{p.text}</p>
+              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5 text-xs text-zinc-400">
+                <button className="flex items-center gap-1.5"><Icon name="heart" size={14} /> {p.likes}</button>
+                <button className="flex items-center gap-1.5"><Icon name="msg" size={14} /> {p.comments}</button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+
+    /* =========================================================
+       ATHLETE — PROFILE / SETTINGS
+       ========================================================= */
+    const Profile = ({ openPricing, logout }) => (
+      <div className="px-5 pt-3 pb-6 space-y-4">
+        <h1 className="text-2xl font-bold">Profil</h1>
+
+        <Card className="p-5">
+          <div className="flex items-center gap-4">
+            <Avatar src={ATHLETE.avatar} size={64} ring />
+            <div>
+              <div className="text-lg font-bold">{ATHLETE.firstName} {ATHLETE.lastName}</div>
+              <div className="text-xs text-zinc-400">{ATHLETE.age} ans · {ATHLETE.height} cm</div>
+              <Pill className="bg-lime-400/10 text-lime-400 mt-1.5">Membre depuis 32 jours</Pill>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-white/5 text-center">
+            <div><div className="text-xl font-bold">{ATHLETE.streak}</div><div className="text-[10px] text-zinc-500 uppercase">Streak</div></div>
+            <div><div className="text-xl font-bold gradient-text">{ATHLETE.weeklyScore}</div><div className="text-[10px] text-zinc-500 uppercase">Score</div></div>
+            <div><div className="text-xl font-bold">{ATHLETE.badges.length}</div><div className="text-[10px] text-zinc-500 uppercase">Badges</div></div>
+          </div>
+        </Card>
+
+        <Card className="p-5 bg-gradient-to-br from-lime-400/10 via-zinc-900/70 to-zinc-900/70 border-lime-400/20">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-2xl gradient-lime flex items-center justify-center"><Icon name="crown" size={22} className="text-zinc-950" strokeWidth={2.5} /></div>
+            <div className="flex-1">
+              <div className="font-bold">FitCoach Pro</div>
+              <div className="text-xs text-zinc-300 mt-0.5">Coaching personnalisé · 39€ / mois</div>
+              <div className="text-[11px] text-zinc-500 mt-1">Renouvellement le 31 mai 2026</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <Btn size="sm" variant="ghost" onClick={openPricing}>Changer de plan</Btn>
+            <Btn size="sm" variant="dark">Gérer</Btn>
+          </div>
+        </Card>
+
+        <SettingsGroup title="Mes objectifs">
+          <SettingRow icon="target" label="Objectif de poids" value={`${ATHLETE.goalWeight} kg`} />
+          <SettingRow icon="bolt" label="Niveau d'activité" value="Intermédiaire" />
+          <SettingRow icon="utensils" label="Objectif protéines" value={`${ATHLETE.proteinTarget} g/j`} />
+        </SettingsGroup>
+
+        <SettingsGroup title="Préférences">
+          <SettingRow icon="bell" label="Notifications" value="3 actives" />
+          <SettingRow icon="lock" label="Confidentialité" value="" />
+          <SettingRow icon="info" label="Données & santé" value="" />
+        </SettingsGroup>
+
+        <SettingsGroup title="Support">
+          <SettingRow icon="msg" label="Aide & FAQ" />
+          <SettingRow icon="info" label="À propos de FitCoach" />
+        </SettingsGroup>
+
+        <button onClick={logout} className="w-full h-12 rounded-2xl border border-red-500/30 bg-red-500/5 text-red-400 text-sm font-semibold flex items-center justify-center gap-2"><Icon name="logout" size={16} /> Se déconnecter</button>
+
+        <div className="text-center text-[11px] text-zinc-600 pt-2">FitCoach v1.0 · Made with 🔥 in France</div>
+      </div>
+    );
+
+    const SettingsGroup = ({ title, children }) => (
+      <div>
+        <div className="text-[11px] text-zinc-500 uppercase tracking-wider mb-2 px-1">{title}</div>
+        <Card className="overflow-hidden divide-y divide-white/5">{children}</Card>
+      </div>
+    );
+    const SettingRow = ({ icon, label, value }) => (
+      <button className="w-full p-4 flex items-center gap-3 tap-area hover:bg-white/5">
+        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center"><Icon name={icon} size={16} /></div>
+        <div className="flex-1 text-left text-sm font-medium">{label}</div>
+        {value && <div className="text-xs text-zinc-400">{value}</div>}
+        <Icon name="chevR" size={16} className="text-zinc-500" />
+      </button>
+    );
+
+    /* =========================================================
+       NOTIFICATIONS PANEL (slide-in)
+       ========================================================= */
+    const NotifPanel = ({ close }) => (
+      <div className="absolute inset-0 z-30 fade-in" onClick={close}>
+        <div className="absolute inset-0 bg-black/60"></div>
+        <div onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-[85%] bg-zinc-950 border-l border-white/10 slide-up p-4 overflow-y-auto" style={{ animation: "slide-up 0.3s, fade-in 0.2s" }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">Notifications</h2>
+            <button onClick={close} className="p-1.5"><Icon name="x" /></button>
+          </div>
+          <div className="space-y-2">
+            {NOTIFS.map(n => (
+              <Card key={n.id} className="p-3 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-lime-400/10 flex items-center justify-center shrink-0"><Icon name={n.icon} size={16} className="text-lime-400" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold leading-tight">{n.title}</div>
+                  <div className="text-xs text-zinc-400 mt-0.5">{n.text}</div>
+                  <div className="text-[11px] text-zinc-600 mt-1">{n.time}</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    /* =========================================================
+       COACH — DASHBOARD
+       ========================================================= */
+    const CoachHome = ({ go, openAthlete }) => {
+      const top = ATHLETES.filter(a => a.status === "top").length;
+      const watch = ATHLETES.filter(a => a.status === "watch").length;
+      const alert = ATHLETES.filter(a => a.status === "alert").length;
+      return (
+        <div className="px-5 pt-3 pb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar n={68} size={40} />
+              <div>
+                <div className="text-xs text-zinc-400">Coach</div>
+                <div className="font-semibold leading-tight">Maxime Durand</div>
+              </div>
+            </div>
+            <button onClick={() => go("alerts")} className="relative w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center">
+              <Icon name="bell" size={18} />
+              <span className="absolute top-1.5 right-2 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white">{ALERTS.filter(a => a.severity === "high").length}</span>
+            </button>
+          </div>
+
+          <Card className="p-5 bg-gradient-to-br from-zinc-900 to-zinc-900/40 relative overflow-hidden">
+            <div className="text-xs text-zinc-400 uppercase tracking-wider">Vue d'ensemble · cette semaine</div>
+            <div className="grid grid-cols-3 gap-4 mt-3">
+              <div><div className="text-3xl font-bold">{ATHLETES.length}</div><div className="text-[11px] text-zinc-400">athlètes</div></div>
+              <div><div className="text-3xl font-bold gradient-text">12</div><div className="text-[11px] text-zinc-400">check-ins</div></div>
+              <div><div className="text-3xl font-bold text-red-400">{alert}</div><div className="text-[11px] text-zinc-400">alertes</div></div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 rounded-xl bg-emerald-400/10"><div className="text-emerald-400 text-lg font-bold">{top}</div><div className="text-[10px] text-zinc-400">en forme</div></div>
+              <div className="p-2 rounded-xl bg-amber-400/10"><div className="text-amber-400 text-lg font-bold">{watch}</div><div className="text-[10px] text-zinc-400">à surveiller</div></div>
+              <div className="p-2 rounded-xl bg-red-400/10"><div className="text-red-400 text-lg font-bold">{alert}</div><div className="text-[10px] text-zinc-400">en alerte</div></div>
+            </div>
+          </Card>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold flex items-center gap-2">Alertes urgentes <Pill className="bg-red-500/20 text-red-400">{ALERTS.filter(a => a.severity === "high").length}</Pill></h3>
+              <button onClick={() => go("alerts")} className="text-xs text-lime-400 font-semibold flex items-center gap-1">Tout voir <Icon name="chevR" size={14} /></button>
+            </div>
+            <div className="space-y-2">
+              {ALERTS.filter(a => a.severity === "high").map(al => (
+                <Card key={al.id} className="p-3 flex items-center gap-3 border-l-2 border-l-red-500/60">
+                  <Avatar n={al.avatar} size={40} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{al.athlete}</div>
+                    <div className="text-xs text-red-400 mt-0.5">{al.title}</div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5 truncate">{al.text}</div>
+                  </div>
+                  <button onClick={() => openAthlete(al.athleteId)} className="px-3 h-9 rounded-xl bg-lime-400 text-zinc-950 text-xs font-bold">Voir</button>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">Derniers check-ins</h3>
+              <button onClick={() => go("athletes")} className="text-xs text-lime-400 font-semibold">Tous</button>
+            </div>
+            <div className="space-y-2">
+              {ATHLETES.slice(0, 4).map(a => (
+                <Card key={a.id} className="p-3 flex items-center gap-3 tap-area" onClick={() => openAthlete(a.id)}>
+                  <Avatar n={a.avatar} size={44} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2"><span className="text-sm font-semibold truncate">{a.name}</span><StatusDot status={a.status} /></div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5">Check-in {a.lastCheckin} · {a.delta < 0 ? "↓" : "↑"} {Math.abs(a.delta)} kg</div>
+                  </div>
+                  <div className="text-right">
+                    <div className={cls("text-lg font-bold", a.score >= 80 ? "text-lime-400" : a.score >= 60 ? "text-amber-400" : "text-red-400")}>{a.score}</div>
+                    <div className="text-[10px] text-zinc-500">/ 100</div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       COACH — ATHLETE LIST
+       ========================================================= */
+    const AthleteList = ({ openAthlete }) => {
+      const [q, setQ] = useState("");
+      const [filter, setFilter] = useState("all");
+      const filtered = ATHLETES.filter(a => (filter === "all" || a.status === filter) && a.name.toLowerCase().includes(q.toLowerCase()));
+      return (
+        <div className="px-5 pt-3 pb-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Athlètes</h1>
+            <Pill className="bg-lime-400/10 text-lime-400">{ATHLETES.length} actifs</Pill>
+          </div>
+          <div className="relative">
+            <Icon name="search" size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Rechercher un athlète..." className="w-full h-12 bg-zinc-900 border border-white/5 rounded-2xl pl-11 pr-4 text-sm" />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hidden -mx-5 px-5">
+            {[
+              { k: "all", t: "Tous", c: ATHLETES.length },
+              { k: "top", t: "Top", c: ATHLETES.filter(a => a.status === "top").length },
+              { k: "ok", t: "En forme", c: ATHLETES.filter(a => a.status === "ok").length },
+              { k: "watch", t: "À surveiller", c: ATHLETES.filter(a => a.status === "watch").length },
+              { k: "alert", t: "Alerte", c: ATHLETES.filter(a => a.status === "alert").length },
+            ].map(f => (
+              <button key={f.k} onClick={() => setFilter(f.k)} className={cls("h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5", filter === f.k ? "bg-lime-400 text-zinc-950" : "bg-zinc-900 text-zinc-300 border border-white/5")}>
+                {f.t} <span className={cls("text-[10px]", filter === f.k ? "text-zinc-700" : "text-zinc-500")}>{f.c}</span>
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2 mt-1">
+            {filtered.map(a => (
+              <Card key={a.id} onClick={() => openAthlete(a.id)} className="p-4 flex items-center gap-3 tap-area cursor-pointer">
+                <div className="relative">
+                  <Avatar n={a.avatar} size={48} />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-zinc-900 flex items-center justify-center"><StatusDot status={a.status} /></span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold">{a.name}</div>
+                  <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400">
+                    <span>{a.lastCheckin}</span>
+                    <span>·</span>
+                    <span className={a.delta < 0 ? "text-lime-400" : "text-red-400"}>{a.delta < 0 ? "↓" : "↑"} {Math.abs(a.delta)} kg</span>
+                    <span>·</span>
+                    <span className="flex items-center gap-0.5"><Icon name="flame" size={10} /> {a.streak}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={cls("text-xl font-bold", a.score >= 80 ? "text-lime-400" : a.score >= 60 ? "text-amber-400" : "text-red-400")}>{a.score}</div>
+                  <div className="text-[10px] text-zinc-500 uppercase">Score</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       COACH — ATHLETE DETAIL
+       ========================================================= */
+    const AthleteDetail = ({ id, back, openCheckin, openMessage }) => {
+      const a = ATHLETES.find(x => x.id === id) || ATHLETES[0];
+      const [tab, setTab] = useState("overview");
+      return (
+        <div className="px-5 pt-3 pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={back} className="p-2 -ml-2"><Icon name="chevL" /></button>
+            <button className="p-2 -mr-2"><Icon name="more" /></button>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <Avatar n={a.avatar} size={72} ring />
+            <div className="flex-1">
+              <div className="text-xl font-bold">{a.name}</div>
+              <div className="text-xs text-zinc-400">32 ans · 168 cm · {ATHLETE.goal}</div>
+              <div className="flex items-center gap-2 mt-2">
+                <Pill className="bg-lime-400/10 text-lime-400">Score {a.score}</Pill>
+                <Pill className="bg-orange-500/10 text-orange-400"><Icon name="flame" size={10} /> {a.streak}j</Pill>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <Btn size="sm" onClick={openMessage}><Icon name="msg" size={16} /> Message</Btn>
+            <Btn size="sm" variant="ghost" onClick={openCheckin}><Icon name="clipboard" size={16} /> Check-in</Btn>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 p-1 bg-zinc-900 rounded-2xl mt-5">
+            {[{k:"overview",t:"Vue"},{k:"habits",t:"Habitudes"},{k:"goals",t:"Objectifs"}].map(o => (
+              <button key={o.k} onClick={() => setTab(o.k)} className={cls("h-9 rounded-xl text-sm font-semibold", tab === o.k ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}>{o.t}</button>
+            ))}
+          </div>
+
+          {tab === "overview" && (
+            <div className="space-y-3 mt-4">
+              <Card className="p-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-xs text-zinc-400">Évolution poids</div>
+                    <div className="text-2xl font-bold mt-1">{ATHLETE.currentWeight} kg <span className="text-sm text-lime-400">{a.delta} kg</span></div>
+                  </div>
+                  <Pill className="bg-lime-400/10 text-lime-400">12 sem.</Pill>
+                </div>
+                <div className="mt-3"><LineChart data={ATHLETE.weightHistory} goal={ATHLETE.goalWeight} height={120} /></div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-2">Adhésion 7 jours</div>
+                <BarChart data={ATHLETE.weekScores} height={90} />
+              </Card>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-4">
+                  <div className="text-[10px] text-zinc-500 uppercase">Programme</div>
+                  <div className="text-2xl font-bold mt-1">J 32<span className="text-sm text-zinc-500">/90</span></div>
+                  <div className="text-[11px] text-lime-400 mt-1">Phase Construction</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-[10px] text-zinc-500 uppercase">Dernier check-in</div>
+                  <div className="text-2xl font-bold mt-1">2 mai</div>
+                  <div className="text-[11px] text-zinc-400 mt-1">Score 84/100</div>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {tab === "habits" && (
+            <div className="space-y-3 mt-4">
+              {[
+                { name: "Eau", icon: "droplet", color: "text-sky-400", v: 88, sub: "6.8 / 8 verres" },
+                { name: "Sommeil", icon: "moon", color: "text-indigo-400", v: 78, sub: "7.2h en moyenne" },
+                { name: "Pas", icon: "footprints", color: "text-amber-400", v: 72, sub: "8 940 / 10k" },
+                { name: "Nutrition", icon: "utensils", color: "text-lime-400", v: 84, sub: "4.1 / 5" },
+                { name: "Entraînement", icon: "bolt", color: "text-orange-400", v: 100, sub: "3 / 3 séances" },
+              ].map(h => (
+                <Card key={h.name} className="p-4">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center"><Icon name={h.icon} size={16} className={h.color} /></div>
+                    <div className="flex-1"><div className="text-sm font-semibold">{h.name}</div><div className="text-[11px] text-zinc-500">{h.sub}</div></div>
+                    <div className={cls("text-xl font-bold", h.v >= 80 ? "text-lime-400" : h.v >= 60 ? "text-amber-400" : "text-red-400")}>{h.v}<span className="text-xs text-zinc-500">%</span></div>
+                  </div>
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full gradient-lime" style={{ width: `${h.v}%` }}></div></div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {tab === "goals" && (
+            <div className="space-y-3 mt-4">
+              <Card className="p-4">
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-3">Modifier les objectifs</div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5"><span className="text-zinc-400">Objectif poids</span><span className="font-bold">{ATHLETE.goalWeight} kg</span></div>
+                    <input type="range" min="55" max="85" defaultValue={ATHLETE.goalWeight} className="lime w-full" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5"><span className="text-zinc-400">Protéines / jour</span><span className="font-bold">{ATHLETE.proteinTarget} g</span></div>
+                    <input type="range" min="60" max="200" defaultValue={ATHLETE.proteinTarget} className="lime w-full" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5"><span className="text-zinc-400">Pas / jour</span><span className="font-bold">10 000</span></div>
+                    <input type="range" min="3000" max="15000" defaultValue={10000} className="lime w-full" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1.5"><span className="text-zinc-400">Sommeil / nuit</span><span className="font-bold">8 h</span></div>
+                    <input type="range" min="5" max="10" step="0.5" defaultValue={8} className="lime w-full" />
+                  </div>
+                </div>
+                <Btn size="md" className="w-full mt-4">Enregistrer</Btn>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-zinc-400 uppercase tracking-wider mb-2">Recommandation nutrition</div>
+                <textarea defaultValue="Ajoute 20g de protéines en collation les jours d'entraînement. Skyr 0% ou whey." className="w-full bg-zinc-800 border border-white/5 rounded-xl p-3 text-sm h-24 resize-none" />
+                <Btn size="sm" variant="ghost" className="w-full mt-2">Mettre à jour</Btn>
+              </Card>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* =========================================================
+       COACH — CHECK-IN REVIEW
+       ========================================================= */
+    const CheckinReview = ({ back }) => {
+      const [feedback, setFeedback] = useState("Très belle semaine Sophie ! Ton adhésion nutrition est top. Continue sur cette lancée et augmente progressivement les pas le week-end.");
+      const [sent, setSent] = useState(false);
+      return (
+        <div className="px-5 pt-3 pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={back} className="p-2 -ml-2"><Icon name="chevL" /></button>
+            <div className="text-sm font-semibold">Check-in semaine 5</div>
+            <div className="w-9"></div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-4">
+            <Avatar n={47} size={48} />
+            <div>
+              <div className="font-semibold">Sophie Martin</div>
+              <div className="text-[11px] text-zinc-400">Reçu le 2 mai · Il y a 2 jours</div>
+            </div>
+          </div>
+
+          <Card className="p-4 mb-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] text-zinc-500 uppercase">Poids</div>
+                <div className="text-2xl font-bold mt-1">73.1 <span className="text-sm text-zinc-500">kg</span></div>
+                <Pill className="bg-lime-400/10 text-lime-400 mt-1">↓ 0.3 kg</Pill>
+              </div>
+              <div>
+                <div className="text-[10px] text-zinc-500 uppercase">Score hebdo</div>
+                <div className="text-2xl font-bold gradient-text mt-1">84</div>
+                <Pill className="bg-emerald-400/10 text-emerald-400 mt-1">+6 vs S4</Pill>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-3 mb-3">
+            <div className="text-xs text-zinc-400 mb-2">Photos · Face / Profil / Dos</div>
+            <div className="grid grid-cols-3 gap-2">
+              {["Face","Profil","Dos"].map((p, i) => (
+                <div key={p} className="aspect-[3/4] rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-cover bg-center opacity-50" style={{backgroundImage: `url('https://images.unsplash.com/photo-15${710 + i}19613454-1cb2f99b2d8b?w=200')`}}></div>
+                  <div className="absolute bottom-1.5 left-1.5 text-[10px] bg-black/70 px-1.5 py-0.5 rounded">{p}</div>
+                </div>
+              ))}
+            </div>
+            <Btn size="sm" variant="ghost" className="w-full mt-3">Comparer aux semaines précédentes</Btn>
+          </Card>
+
+          <div className="space-y-2 mb-4">
+            {[
+              { l: "Sensation générale", v: 7, c: "rose-400" },
+              { l: "Adhésion nutrition", v: 8, c: "lime-400" },
+              { l: "Qualité du sommeil", v: 6, c: "indigo-400" },
+              { l: "Motivation", v: 8, c: "orange-400" },
+            ].map((f, i) => (
+              <Card key={i} className="p-3 flex items-center gap-3">
+                <div className="flex-1 text-sm">{f.l}</div>
+                <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden"><div className={cls("h-full bg-" + f.c)} style={{ width: `${f.v * 10}%` }}></div></div>
+                <div className="text-sm font-bold tabular-nums w-8 text-right">{f.v}<span className="text-[10px] text-zinc-500">/10</span></div>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="p-4 mb-3">
+            <div className="text-xs text-zinc-400 mb-1">Difficulté principale</div>
+            <p className="text-sm">"Le snack du soir devant Netflix, j'ai craqué 2 fois cette semaine."</p>
+          </Card>
+
+          <Card className="p-4 mb-4">
+            <div className="text-xs text-zinc-400 mb-1">Commentaire libre</div>
+            <p className="text-sm">"Le programme me plaît vraiment. J'aimerais ajouter une session de mobilité, mes hanches sont raides."</p>
+          </Card>
+
+          <Card className="p-4">
+            <div className="text-xs text-zinc-400 uppercase tracking-wider mb-2">Ton feedback</div>
+            <textarea value={feedback} onChange={e => setFeedback(e.target.value)} className="w-full bg-zinc-800 border border-white/5 rounded-xl p-3 text-sm h-32 resize-none" />
+            <div className="flex gap-2 mt-3">
+              <button className="px-3 h-9 rounded-xl bg-zinc-800 text-xs font-semibold border border-white/5">📋 Modèles</button>
+              <button className="px-3 h-9 rounded-xl bg-zinc-800 text-xs font-semibold border border-white/5">🎯 Ajuster objectifs</button>
+            </div>
+            <Btn size="md" className="w-full mt-3" onClick={() => setSent(true)} disabled={sent}>{sent ? "✓ Feedback envoyé" : "Envoyer le feedback"}</Btn>
+          </Card>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       COACH — ALERTS
+       ========================================================= */
+    const Alerts = ({ openAthlete, back }) => (
+      <div className="px-5 pt-3 pb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Alertes</h1>
+          <Pill className="bg-red-500/10 text-red-400">{ALERTS.length} actives</Pill>
+        </div>
+        {ALERTS.map(al => (
+          <Card key={al.id} onClick={() => openAthlete(al.athleteId)} className={cls("p-4 flex gap-3 tap-area cursor-pointer border-l-2", al.severity === "high" ? "border-l-red-500" : al.severity === "med" ? "border-l-amber-400" : "border-l-zinc-600")}>
+            <Avatar n={al.avatar} size={44} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">{al.athlete}</span>
+                <Pill className={cls(al.severity === "high" ? "bg-red-500/15 text-red-400" : al.severity === "med" ? "bg-amber-400/10 text-amber-400" : "bg-zinc-700 text-zinc-300")}>{al.title}</Pill>
+              </div>
+              <div className="text-xs text-zinc-300 mt-1">{al.text}</div>
+              <div className="text-[11px] text-zinc-500 mt-1">{al.date}</div>
+            </div>
+            <Icon name="chevR" size={18} className="text-zinc-500 shrink-0 mt-3" />
+          </Card>
+        ))}
+        <Card className="p-4 bg-emerald-400/5 border-emerald-400/20 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-emerald-400/20 flex items-center justify-center"><Icon name="check" size={16} className="text-emerald-400" /></div>
+          <div className="text-xs text-zinc-300">Les alertes sont déclenchées automatiquement : inactivité 3j+, score hebdo {"<"}50, sommeil {"<"}5h, plateau {">"}3 sem.</div>
+        </Card>
+      </div>
+    );
+
+    /* =========================================================
+       COACH — MESSAGES (conversation list)
+       ========================================================= */
+    const CoachMessages = ({ openChat }) => (
+      <div className="px-5 pt-3 pb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Messages</h1>
+          <button className="w-10 h-10 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center"><Icon name="edit" size={16} /></button>
+        </div>
+        <div className="relative">
+          <Icon name="search" size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input placeholder="Rechercher..." className="w-full h-12 bg-zinc-900 border border-white/5 rounded-2xl pl-11 pr-4 text-sm" />
+        </div>
+        <div className="space-y-1">
+          {ATHLETES.slice(0, 6).map((a, i) => (
+            <button key={a.id} onClick={openChat} className="w-full p-3 rounded-2xl flex items-center gap-3 tap-area hover:bg-white/5">
+              <div className="relative">
+                <Avatar n={a.avatar} size={48} />
+                {i < 2 && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-zinc-950"></span>}
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold truncate">{a.name}</div>
+                  <div className="text-[10px] text-zinc-500 shrink-0">{["09:25","08:42","Hier","Hier","Lun","Dim"][i]}</div>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className={cls("text-xs truncate", i < 2 ? "text-white" : "text-zinc-500")}>
+                    {["Pas de souci, je te propose un swap...","Top, j'ai battu mon record sur Fran","Merci pour les conseils !","Je vais essayer cette semaine","Question rapide sur les macros","Photos envoyées 📸"][i]}
+                  </div>
+                  {i === 0 && <Pill className="bg-lime-400 text-zinc-950 ml-auto shrink-0">2</Pill>}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+
+    /* =========================================================
+       COACH — SETTINGS
+       ========================================================= */
+    const CoachSettings = ({ logout }) => (
+      <div className="px-5 pt-3 pb-6 space-y-4">
+        <h1 className="text-2xl font-bold">Paramètres</h1>
+        <Card className="p-5">
+          <div className="flex items-center gap-4">
+            <Avatar n={68} size={64} ring />
+            <div>
+              <div className="text-lg font-bold">Maxime Durand</div>
+              <div className="text-xs text-zinc-400">Coach · Box CrossFit Lyon</div>
+              <Pill className="bg-lime-400/10 text-lime-400 mt-1.5">Plan Coach Pro</Pill>
+            </div>
+          </div>
+        </Card>
+        <SettingsGroup title="Mon activité">
+          <SettingRow icon="users" label="Athlètes maximum" value="50" />
+          <SettingRow icon="bell" label="Alertes & notifications" value="" />
+          <SettingRow icon="clipboard" label="Modèles de feedback" value="6 actifs" />
+        </SettingsGroup>
+        <SettingsGroup title="Programmes">
+          <SettingRow icon="target" label="Programmes 90 jours" value="3 actifs" />
+          <SettingRow icon="utensils" label="Plans nutrition" value="" />
+          <SettingRow icon="bolt" label="Défis communauté" value="1 actif" />
+        </SettingsGroup>
+        <SettingsGroup title="Compte">
+          <SettingRow icon="crown" label="Abonnement Coach" value="Pro" />
+          <SettingRow icon="settings" label="Paramètres" />
+          <SettingRow icon="info" label="Aide" />
+        </SettingsGroup>
+        <button onClick={logout} className="w-full h-12 rounded-2xl border border-red-500/30 bg-red-500/5 text-red-400 text-sm font-semibold flex items-center justify-center gap-2"><Icon name="logout" size={16} /> Se déconnecter</button>
+      </div>
+    );
+
+    /* =========================================================
+       PRICING + STRIPE-LIKE CHECKOUT
+       ========================================================= */
+    const Pricing = ({ back, onSelect }) => (
+      <div className="px-5 pt-3 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={back} className="p-2 -ml-2"><Icon name="chevL" /></button>
+          <div className="text-sm font-semibold">Plans & abonnement</div>
+          <div className="w-9"></div>
+        </div>
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold">Choisis ton <span className="gradient-text">niveau</span></h1>
+          <p className="text-sm text-zinc-400 mt-2">Annulable à tout moment, sans engagement</p>
+        </div>
+        <div className="space-y-3">
+          {PRICING_PLANS.map(p => (
+            <Card key={p.id} className={cls("p-5 relative", p.popular && "ring-2 ring-lime-400/40")}>
+              {p.popular && <Pill className="absolute -top-2 left-5 bg-lime-400 text-zinc-950">★ Le plus populaire</Pill>}
+              <div className="flex items-baseline justify-between">
+                <div className="text-lg font-bold">{p.name}</div>
+                <div className="text-3xl font-bold">{p.price}€<span className="text-sm text-zinc-500 font-normal"> / mois</span></div>
+              </div>
+              <ul className="mt-4 space-y-2">
+                {p.features.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-zinc-300">
+                    <div className="w-5 h-5 rounded-full bg-lime-400/15 flex items-center justify-center shrink-0"><Icon name="check" size={12} className="text-lime-400" strokeWidth={3} /></div>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Btn size="md" variant={p.popular ? "primary" : "ghost"} className="w-full mt-5" onClick={() => onSelect(p)}>
+                {p.popular ? "Démarrer mon essai 7j" : "Choisir"}
+              </Btn>
+            </Card>
+          ))}
+        </div>
+        <div className="mt-6 text-center text-[11px] text-zinc-500">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Icon name="lock" size={12} /> Paiement sécurisé · Powered by Stripe
+          </div>
+          <div>TVA incluse · Facture envoyée par email</div>
+        </div>
+      </div>
+    );
+
+    const StripeCheckout = ({ plan, close, onSuccess }) => {
+      const [card, setCard] = useState("4242 4242 4242 4242");
+      const [exp, setExp] = useState("12 / 28");
+      const [cvc, setCvc] = useState("123");
+      const [name, setName] = useState("Sophie Martin");
+      const [loading, setLoading] = useState(false);
+      const [success, setSuccess] = useState(false);
+      const submit = () => {
+        setLoading(true);
+        setTimeout(() => { setLoading(false); setSuccess(true); setTimeout(onSuccess, 1500); }, 1800);
+      };
+      return (
+        <div className="absolute inset-0 z-40 flex items-end fade-in">
+          <div className="absolute inset-0 bg-black/70" onClick={close}></div>
+          <div className="relative bg-zinc-950 w-full rounded-t-3xl border-t border-white/10 slide-up max-h-[90%] overflow-y-auto scrollbar-hidden">
+            <div className="sticky top-0 bg-zinc-950 z-10 px-5 pt-3 pb-2 flex items-center justify-between border-b border-white/5">
+              <button onClick={close} className="text-sm text-zinc-400">Annuler</button>
+              <div className="text-xs font-semibold text-zinc-300">Paiement sécurisé</div>
+              <div className="w-12"></div>
+            </div>
+
+            {success ? (
+              <div className="px-6 py-12 text-center">
+                <div className="w-20 h-20 rounded-full gradient-lime mx-auto flex items-center justify-center mb-4 scale-in"><Icon name="check" size={40} className="text-zinc-950" strokeWidth={4} /></div>
+                <h3 className="text-2xl font-bold">Paiement validé 🎉</h3>
+                <p className="text-zinc-400 mt-2">Bienvenue dans <strong className="text-white">FitCoach {plan.name}</strong></p>
+              </div>
+            ) : (
+              <>
+                <div className="px-5 pt-5">
+                  <div className="text-xs text-zinc-400">Tu t'abonnes à</div>
+                  <div className="flex items-center justify-between mt-1">
+                    <div>
+                      <div className="text-lg font-bold">FitCoach {plan.name}</div>
+                      <div className="text-[11px] text-lime-400">7 jours d'essai gratuit, puis…</div>
+                    </div>
+                    <div className="text-2xl font-bold">{plan.price}€<span className="text-xs text-zinc-500">/mois</span></div>
+                  </div>
+                </div>
+
+                <div className="px-5 mt-5 space-y-3">
+                  <div>
+                    <label className="text-[11px] text-zinc-500 uppercase tracking-wider">Email</label>
+                    <input defaultValue="sophie.martin@gmail.com" className="w-full h-12 bg-zinc-900 border border-white/5 rounded-2xl px-4 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-zinc-500 uppercase tracking-wider">Informations carte</label>
+                    <div className="mt-1 rounded-2xl border border-white/5 overflow-hidden">
+                      <div className="relative">
+                        <input value={card} onChange={e => setCard(e.target.value)} placeholder="1234 1234 1234 1234" className="w-full h-12 bg-zinc-900 px-4 pr-16 text-sm" />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                          <div className="w-7 h-5 rounded bg-gradient-to-r from-blue-600 to-blue-500"></div>
+                          <div className="w-7 h-5 rounded bg-gradient-to-r from-red-500 via-orange-400 to-yellow-400"></div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 border-t border-white/5">
+                        <input value={exp} onChange={e => setExp(e.target.value)} placeholder="MM / AA" className="h-12 bg-zinc-900 px-4 text-sm border-r border-white/5" />
+                        <input value={cvc} onChange={e => setCvc(e.target.value)} placeholder="CVC" className="h-12 bg-zinc-900 px-4 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-zinc-500 uppercase tracking-wider">Nom sur la carte</label>
+                    <input value={name} onChange={e => setName(e.target.value)} className="w-full h-12 bg-zinc-900 border border-white/5 rounded-2xl px-4 text-sm mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-zinc-500 uppercase tracking-wider">Pays</label>
+                    <select className="w-full h-12 bg-zinc-900 border border-white/5 rounded-2xl px-4 text-sm mt-1 appearance-none">
+                      <option>France</option><option>Belgique</option><option>Suisse</option><option>Canada</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="px-5 mt-5 pb-3">
+                  <div className="flex items-start gap-2 text-[11px] text-zinc-400 mb-3">
+                    <Icon name="lock" size={12} className="mt-0.5 shrink-0" />
+                    <span>Tu seras débité de <strong className="text-white">0€</strong> aujourd'hui. Ton essai gratuit de 7 jours commence maintenant. Tu peux annuler à tout moment depuis ton profil.</span>
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-zinc-950 border-t border-white/5 px-5 py-4">
+                  <Btn size="lg" className="w-full" onClick={submit} disabled={loading}>
+                    {loading ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin"></span> Paiement en cours...</span> : `Démarrer mon essai · ${plan.price}€ / mois après`}
+                  </Btn>
+                  <div className="text-center text-[10px] text-zinc-600 mt-3 flex items-center justify-center gap-1.5">Powered by <span className="font-semibold text-zinc-400">stripe</span></div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    /* =========================================================
+       APP ROOT
+       ========================================================= */
+    const ATHLETE_TABS = [
+      { key: "home", label: "Accueil", icon: "home" },
+      { key: "history", label: "Progrès", icon: "chart" },
+      { key: "checkin", label: "Check-in", icon: "target" },
+      { key: "messages", label: "Coach", icon: "msg" },
+      { key: "profile", label: "Profil", icon: "settings" },
+    ];
+
+    const COACH_TABS = [
+      { key: "home", label: "Vue", icon: "home" },
+      { key: "athletes", label: "Athlètes", icon: "users" },
+      { key: "alerts", label: "Alertes", icon: "alert" },
+      { key: "messages", label: "Messages", icon: "msg" },
+      { key: "settings", label: "Réglages", icon: "settings" },
+    ];
+
+    const App = () => {
+      const [view, setView] = useState("login");
+      const [role, setRole] = useState("athlete");
+      const [tab, setTab] = useState("home");
+      const [openAthleteId, setOpenAthleteId] = useState(null);
+      const [extraScreen, setExtraScreen] = useState(null);
+      const [notifsOpen, setNotifsOpen] = useState(false);
+      const [pricingOpen, setPricingOpen] = useState(false);
+      const [checkout, setCheckout] = useState(null);
+      const [tabsHidden, setTabsHidden] = useState(false);
+
+      const switchRole = (r) => { setRole(r); setView("home"); setTab("home"); setOpenAthleteId(null); setExtraScreen(null); };
+
+      const renderAthlete = () => {
+        if (extraScreen === "daily") return <DailyTracking back={() => setExtraScreen(null)} onValidate={() => setExtraScreen(null)} />;
+        if (extraScreen === "weekly") return <WeeklyCheckin back={() => setExtraScreen(null)} />;
+        if (extraScreen === "history") return <ProgressHistory back={() => setExtraScreen(null)} />;
+        if (extraScreen === "program") return <Program />;
+        if (extraScreen === "community") return <Community />;
+        if (extraScreen === "messages") return <Messages back={() => setExtraScreen(null)} />;
+        switch (tab) {
+          case "home": return <AthleteHome go={(s) => setExtraScreen(s)} openNotifs={() => setNotifsOpen(true)} />;
+          case "history": return <ProgressHistory back={() => setTab("home")} />;
+          case "checkin": return <WeeklyCheckin back={() => setTab("home")} />;
+          case "messages": return <Messages back={() => setTab("home")} />;
+          case "profile": return <Profile openPricing={() => setPricingOpen(true)} logout={() => setView("login")} />;
+          default: return null;
+        }
+      };
+
+      const renderCoach = () => {
+        if (openAthleteId && extraScreen === "checkin") return <CheckinReview back={() => setExtraScreen(null)} />;
+        if (openAthleteId && extraScreen === "message") return <Messages back={() => setExtraScreen(null)} />;
+        if (openAthleteId) return <AthleteDetail id={openAthleteId} back={() => setOpenAthleteId(null)} openCheckin={() => setExtraScreen("checkin")} openMessage={() => setExtraScreen("message")} />;
+        switch (tab) {
+          case "home": return <CoachHome go={setTab} openAthlete={(id) => setOpenAthleteId(id)} />;
+          case "athletes": return <AthleteList openAthlete={(id) => setOpenAthleteId(id)} />;
+          case "alerts": return <Alerts openAthlete={(id) => { setTab("athletes"); setOpenAthleteId(id); }} />;
+          case "messages": return <CoachMessages openChat={() => setExtraScreen("chat")} />;
+          case "settings": return <CoachSettings logout={() => setView("login")} />;
+          default: return null;
+        }
+      };
+
+      // Determine TabBar visibility
+      const showTabBar = view === "home" && (
+        (role === "athlete" && !["daily","weekly"].includes(extraScreen)) ||
+        (role === "coach" && !openAthleteId && extraScreen !== "chat")
+      );
+      const inExtra = extraScreen === "messages" || (role === "coach" && extraScreen === "chat");
+
+      const tabBar = role === "athlete"
+        ? <TabBar items={ATHLETE_TABS} value={tab} onChange={(k) => { setTab(k); setExtraScreen(null); setOpenAthleteId(null); }} />
+        : <TabBar items={COACH_TABS} value={tab} onChange={(k) => { setTab(k); setExtraScreen(null); setOpenAthleteId(null); }} />;
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Demo controls */}
+          <div className="sticky top-0 z-50 px-4 py-3 border-b border-white/5 backdrop-blur-xl bg-black/60">
+            <div className="max-w-5xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg gradient-lime flex items-center justify-center"><Icon name="bolt" size={16} className="text-zinc-950" strokeWidth={3} /></div>
+                <div>
+                  <div className="font-bold text-sm leading-tight">FitCoach <span className="text-zinc-500 font-normal">— Prototype</span></div>
+                  <div className="text-[10px] text-zinc-500">Mobile-first · Dark · FR</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-1 p-1 bg-zinc-900 rounded-xl border border-white/5">
+                  <button onClick={() => switchRole("athlete")} className={cls("h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5", role === "athlete" ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}><Icon name="bolt" size={12} /> Athlète</button>
+                  <button onClick={() => switchRole("coach")} className={cls("h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5", role === "coach" ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}><Icon name="users" size={12} /> Coach</button>
+                </div>
+                <button onClick={() => setView("login")} className="hidden md:flex h-9 px-3 rounded-xl bg-zinc-900 border border-white/5 text-xs font-semibold items-center gap-1.5"><Icon name="logout" size={12} /> Login</button>
+                <button onClick={() => setPricingOpen(true)} className="hidden md:flex h-9 px-3 rounded-xl bg-zinc-900 border border-white/5 text-xs font-semibold items-center gap-1.5"><Icon name="crown" size={12} /> Pricing</button>
+              </div>
+            </div>
+            <div className="flex md:hidden items-center justify-center gap-1 mt-3 p-1 bg-zinc-900 rounded-xl border border-white/5">
+              <button onClick={() => switchRole("athlete")} className={cls("flex-1 h-8 rounded-lg text-xs font-semibold", role === "athlete" ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}>Athlète</button>
+              <button onClick={() => switchRole("coach")} className={cls("flex-1 h-8 rounded-lg text-xs font-semibold", role === "coach" ? "bg-lime-400 text-zinc-950" : "text-zinc-400")}>Coach</button>
+              <button onClick={() => setView("login")} className="h-8 px-3 rounded-lg text-xs font-semibold text-zinc-400">Login</button>
+              <button onClick={() => setPricingOpen(true)} className="h-8 px-3 rounded-lg text-xs font-semibold text-zinc-400">€</button>
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div className="flex-1 flex items-start justify-center py-6 md:py-10 px-4">
+            <PhoneFrame
+              tabBar={view === "home" && showTabBar && !inExtra ? tabBar : null}
+              hideTabBar={view !== "home" || !showTabBar || inExtra}
+            >
+              <div className="relative">
+                {view === "login" && <Login onLogin={() => { setView("home"); setTab("home"); setExtraScreen(null); setOpenAthleteId(null); }} onSignup={() => setView("onboarding")} />}
+                {view === "onboarding" && <Onboarding onDone={() => { setView("home"); setRole("athlete"); }} />}
+                {view === "home" && (role === "athlete" ? renderAthlete() : renderCoach())}
+                {notifsOpen && <NotifPanel close={() => setNotifsOpen(false)} />}
+                {pricingOpen && !checkout && (
+                  <div className="absolute inset-0 z-30 bg-zinc-950 fade-in overflow-y-auto scrollbar-hidden">
+                    <Pricing back={() => setPricingOpen(false)} onSelect={(p) => setCheckout(p)} />
+                  </div>
+                )}
+                {pricingOpen && checkout && <StripeCheckout plan={checkout} close={() => setCheckout(null)} onSuccess={() => { setCheckout(null); setPricingOpen(false); }} />}
+              </div>
+            </PhoneFrame>
+          </div>
+
+          <div className="max-w-5xl mx-auto px-4 pb-8 text-center text-xs text-zinc-500">
+            <div>Prototype cliquable · Données mockées · Aucun backend connecté</div>
+            <div className="mt-1">Stripe checkout : carte test <span className="font-mono text-zinc-400">4242 4242 4242 4242</span> · n'importe quel CVC / date future</div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
